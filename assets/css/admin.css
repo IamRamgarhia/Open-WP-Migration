@@ -1,54 +1,129 @@
-/* Open WP Migration - Modern Admin UI */
+/* Open Migration - admin interface */
+
 .owpm-wrap {
-    max-width: 800px;
-    margin: 20px auto;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-    color: #3c434a;
+    max-width: 940px;
+    margin: 14px auto 30px;
+    color: #2c3338;
 }
 
+.owpm-shell {
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* Header -------------------------------------------------------------- */
+
 .owpm-header {
-    background: #ffffff;
-    padding: 30px;
-    text-align: center;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2271b1 100%);
+    color: #fff;
+    padding: 18px 26px;
     border-radius: 12px 12px 0 0;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.02);
-    border-bottom: 1px solid #f0f0f1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.owpm-brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.owpm-logo {
+    font-size: 28px;
+    width: 28px;
+    height: 28px;
+    opacity: .9;
 }
 
 .owpm-header h1 {
-    color: #1d2327;
-    font-size: 28px;
+    margin: 0;
+    font-size: 21px;
     font-weight: 600;
-    margin: 0 0 5px 0;
+    color: #fff;
+    padding: 0;
+    line-height: 1.2;
 }
 
 .owpm-header p {
-    color: #646970;
-    font-size: 16px;
-    margin: 0;
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, .78);
 }
+
+.owpm-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.owpm-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255, 255, 255, .16);
+    color: #fff;
+    padding: 5px 11px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.owpm-chip .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+.owpm-chip-quiet {
+    background: rgba(255, 255, 255, .09);
+    color: rgba(255, 255, 255, .75);
+    font-family: Consolas, Monaco, monospace;
+}
+
+/* Tabs ---------------------------------------------------------------- */
 
 .owpm-tabs {
     display: flex;
-    background: #ffffff;
-    border-bottom: 1px solid #c3c4c7;
+    background: #fff;
+    border-bottom: 1px solid #dcdcde;
 }
 
 .owpm-tab {
     flex: 1;
-    text-align: center;
-    padding: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 12px 8px;
     cursor: pointer;
     font-weight: 500;
-    font-size: 15px;
+    font-size: 14px;
     color: #50575e;
+    background: none;
+    border: none;
     border-bottom: 3px solid transparent;
-    transition: all 0.2s ease;
+    transition: background .15s ease, color .15s ease;
+    font-family: inherit;
+}
+
+.owpm-tab .dashicons {
+    font-size: 17px;
+    width: 17px;
+    height: 17px;
 }
 
 .owpm-tab:hover {
     color: #2271b1;
     background: #f6f7f7;
+}
+
+.owpm-tab:focus-visible {
+    outline: 2px solid #2271b1;
+    outline-offset: -2px;
 }
 
 .owpm-tab.active {
@@ -57,135 +132,921 @@
     background: #f6f7f7;
 }
 
-.owpm-panels {
-    background: #ffffff;
-    border-radius: 0 0 12px 12px;
-    padding: 50px 40px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.04);
-    min-height: 300px;
-    margin-bottom: 20px;
-}
+/* Panels -------------------------------------------------------------- */
 
-.owpm-instructions-panel {
+.owpm-panels {
     background: #fff;
-    border-radius: 12px;
-    padding: 30px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    border-left: 4px solid #2271b1;
-    transition: opacity 0.3s ease;
+    border-radius: 0 0 12px 12px;
+    padding: 24px 28px 28px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, .06);
+    min-height: 260px;
 }
 
 .owpm-panel {
     display: none;
-    animation: fadeIn 0.4s ease;
 }
 
 .owpm-panel.active {
     display: block;
+    animation: owpmFade .25s ease;
+}
+
+.owpm-panel:focus {
+    outline: none;
+}
+
+.owpm-panel-head {
+    margin-bottom: 16px;
+    position: relative;
+    padding-right: 190px;
+}
+
+/* Sits beside the panel heading, linking to that panel's own docs section. */
+.owpm-docs-link {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: #2271b1;
+    text-decoration: none;
+    padding: 4px 10px;
+    border: 1px solid #c5d9ea;
+    border-radius: 20px;
+    background: #f0f6fc;
+    white-space: nowrap;
+}
+
+.owpm-docs-link:hover { background: #e5f0f9; border-color: #2271b1; }
+
+.owpm-docs-link .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+@media screen and (max-width: 782px) {
+    .owpm-panel-head { padding-right: 0; }
+    .owpm-docs-link { position: static; margin-top: 8px; }
 }
 
 .owpm-panel h2 {
-    font-size: 24px;
-    margin-top: 0;
+    font-size: 21px;
+    margin: 0 0 8px;
+    color: #1d2327;
+    font-weight: 600;
+    padding: 0;
+}
+
+.owpm-lead {
+    font-size: 14px;
+    color: #646970;
+    margin: 0;
+    max-width: 68ch;
+}
+
+.owpm-lead code,
+.owpm-step-body code,
+.owpm-alert code {
+    background: #f0f0f1;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+/* Accordions ---------------------------------------------------------- */
+
+/* Reference material lives in these so the primary action stays above the fold. */
+.owpm-accordion {
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    margin-top: 20px;
+    background: #fff;
+}
+
+.owpm-accordion summary {
+    cursor: pointer;
+    padding: 11px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #2271b1;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 8px;
+    user-select: none;
+}
+
+.owpm-accordion summary::-webkit-details-marker { display: none; }
+
+.owpm-accordion summary::before {
+    content: "";
+    width: 0;
+    height: 0;
+    border-left: 5px solid currentColor;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    transition: transform .15s ease;
+    flex: 0 0 auto;
+}
+
+.owpm-accordion[open] summary::before { transform: rotate(90deg); }
+.owpm-accordion summary:hover { background: #f6f7f7; }
+
+.owpm-accordion summary:focus-visible {
+    outline: 2px solid #2271b1;
+    outline-offset: -2px;
+}
+
+.owpm-accordion-body {
+    padding: 4px 16px 14px;
+    border-top: 1px solid #f0f0f1;
+}
+
+.owpm-accordion .owpm-steps { margin-bottom: 0; }
+.owpm-accordion .owpm-included { margin: 14px 0 0; }
+
+/* Domain swap preview -------------------------------------------------- */
+
+.owpm-swap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 14px;
+}
+
+.owpm-swap-side {
+    flex: 1;
+    min-width: 0;
+}
+
+.owpm-swap-label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: #646970;
+    font-weight: 600;
+    margin-bottom: 3px;
+}
+
+.owpm-swap-url {
+    display: block;
+    font-size: 13px;
+    color: #1d2327;
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    padding: 6px 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.owpm-swap-new { color: #00622e; border-color: #b8e6c1; background: #f5fdf7; }
+.owpm-swap-new.owpm-empty-url { color: #8c8f94; background: #fff; border-color: #dcdcde; }
+
+.owpm-swap-arrow {
+    color: #8c8f94;
+    flex: 0 0 auto;
+    margin-top: 14px;
+}
+
+/* Detected addresses --------------------------------------------------- */
+
+.owpm-suggestions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.owpm-suggestions-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #646970;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+
+.owpm-suggestions-title .dashicons { color: #dba617; font-size: 16px; width: 16px; height: 16px; }
+
+.owpm-candidate {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    background: #f0f6fc;
+    border: 1px solid #c5d9ea;
+    border-radius: 6px;
+    padding: 7px 12px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    transition: border-color .15s ease, background .15s ease;
+}
+
+.owpm-candidate:hover { background: #e5f0f9; border-color: #2271b1; }
+
+.owpm-candidate.owpm-candidate-active {
+    background: #e5f0f9;
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+}
+
+.owpm-candidate code {
+    background: none;
+    padding: 0;
+    font-size: 13px;
     color: #1d2327;
 }
 
-.owpm-panel p {
-    font-size: 15px;
+.owpm-candidate-src {
+    font-size: 11px;
     color: #646970;
+}
+
+
+.owpm-no-candidates {
+    font-size: 12px;
+    color: #646970;
+    margin: 0 0 12px;
+    max-width: 72ch;
+}
+
+.owpm-btn-sm {
+    padding: 6px 14px;
+    font-size: 13px;
+    flex: 0 0 auto;
+}
+
+.owpm-domain-form {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    flex-wrap: wrap;
+}
+
+.owpm-domain-form input[type="text"] {
+    flex: 1;
+    min-width: 220px;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 13px;
+    border: 1px solid #8c8f94;
+    border-radius: 6px;
+}
+
+.owpm-dns-result {
+    margin-top: 12px;
+    font-size: 13px;
+    display: none;
+    border-radius: 6px;
+    padding: 11px 14px;
+    line-height: 1.5;
+}
+
+.owpm-dns-result.owpm-dns-ok       { display: block; background: #edfaef; border-left: 4px solid #00a32a; color: #00622e; }
+.owpm-dns-result.owpm-dns-mismatch { display: block; background: #fcf0f1; border-left: 4px solid #d63638; color: #6b1618; }
+.owpm-dns-result.owpm-dns-unknown  { display: block; background: #fcf9e8; border-left: 4px solid #dba617; color: #8a6d1f; }
+.owpm-dns-result.owpm-dns-busy     { display: block; background: #f6f7f7; border-left: 4px solid #8c8f94; color: #50575e; }
+
+/* Steps --------------------------------------------------------------- */
+
+.owpm-steps {
+    list-style: none;
+    margin: 0 0 24px;
+    padding: 0;
+    counter-reset: owpm;
+}
+
+.owpm-step {
+    display: flex;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.owpm-step:last-child {
+    border-bottom: none;
+}
+
+.owpm-step-n {
+    flex: 0 0 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #2271b1;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 1px;
+}
+
+.owpm-step-body strong {
+    display: block;
+    color: #1d2327;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
+.owpm-step-body p {
+    margin: 0;
+    color: #646970;
+    font-size: 13px;
+}
+
+/* Included / not included -------------------------------------------- */
+
+.owpm-included {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 26px;
+}
+
+.owpm-included-col {
+    background: #f6f7f7;
+    border-radius: 8px;
+    padding: 16px 18px;
+}
+
+.owpm-included-col h4 {
+    margin: 0 0 9px;
+    font-size: 13px;
+    color: #1d2327;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.owpm-included-col h4 .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.owpm-included-col:first-child h4 .dashicons { color: #00a32a; }
+.owpm-included-col:last-child h4 .dashicons { color: #8c8f94; }
+
+.owpm-included-col ul {
+    margin: 0;
+    padding-left: 22px;
+    font-size: 13px;
+    color: #50575e;
+    line-height: 1.75;
+    list-style: disc;
+}
+
+/* Server check -------------------------------------------------------- */
+
+.owpm-status-card {
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    margin-bottom: 18px;
+    overflow: hidden;
+}
+
+.owpm-status-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #f6f7f7;
+    border-bottom: 1px solid #dcdcde;
+    font-size: 13px;
+}
+
+.owpm-status-head .dashicons { color: #2271b1; }
+
+.owpm-status-summary {
+    margin-left: auto;
+    font-weight: 500;
+    color: #646970;
+}
+
+.owpm-status-summary.owpm-ok { color: #00a32a; }
+.owpm-status-summary.owpm-error { color: #d63638; }
+
+.owpm-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.owpm-status-item {
+    padding: 9px 14px;
+    border-right: 1px solid #f0f0f1;
+    border-bottom: 1px solid #f0f0f1;
+    font-size: 13px;
+}
+
+.owpm-status-item-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #50575e;
+}
+
+.owpm-dot {
+    flex: 0 0 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #8c8f94;
+}
+
+.owpm-dot-ok { background: #00a32a; }
+.owpm-dot-warn { background: #dba617; }
+.owpm-dot-error { background: #d63638; }
+.owpm-dot-info { background: #2271b1; }
+
+.owpm-status-value {
+    margin-left: 15px;
+    color: #1d2327;
+    font-weight: 500;
+}
+
+.owpm-status-hint {
+    margin: 4px 0 0 15px;
+    font-size: 12px;
+    color: #8c6d1f;
+}
+
+.owpm-status-item.owpm-is-error .owpm-status-hint { color: #d63638; }
+
+/* Alerts -------------------------------------------------------------- */
+
+.owpm-alert {
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.owpm-alert .dashicons {
+    flex: 0 0 20px;
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+}
+
+.owpm-alert strong { display: block; margin-bottom: 3px; }
+
+.owpm-alert p {
+    margin: 0;
+    font-size: 13px;
     line-height: 1.6;
 }
 
-/* Custom Buttons */
+.owpm-alert-danger {
+    background: #fcf0f1;
+    border-left: 4px solid #d63638;
+    color: #6b1618;
+}
+
+.owpm-alert-danger .dashicons { color: #d63638; }
+
+.owpm-alert-info {
+    background: #f0f6fc;
+    border-left: 4px solid #2271b1;
+    color: #1e3a5f;
+}
+
+.owpm-alert-info .dashicons { color: #2271b1; }
+
+/* Boxes --------------------------------------------------------------- */
+
+.owpm-box {
+    padding: 16px 18px;
+    margin: 0 0 14px;
+    border-radius: 0 8px 8px 0;
+}
+
+.owpm-box h3 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #1d2327;
+}
+
+.owpm-box p {
+    margin: 0 0 14px;
+    font-size: 13px;
+    color: #50575e;
+}
+
+.owpm-box-blue { background: #f0f6fc; border-left: 4px solid #2271b1; }
+.owpm-box-orange { background: #fcf9e8; border-left: 4px solid #dba617; }
+
+.owpm-current-url {
+    margin: 0 0 14px !important;
+    font-size: 13px;
+}
+
+.owpm-current-url code {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    padding: 3px 7px;
+    border-radius: 3px;
+}
+
+.owpm-box label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: #1d2327;
+}
+
+.owpm-box input[type="text"],
+.owpm-box textarea {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    box-sizing: border-box;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.owpm-box textarea { resize: vertical; }
+
+/* Buttons ------------------------------------------------------------- */
+
+.owpm-actions { margin: 4px 0 0; }
+
 .owpm-btn {
     display: inline-block;
-    padding: 12px 24px;
-    font-size: 15px;
+    padding: 11px 22px;
+    font-size: 14px;
     font-weight: 500;
     border-radius: 6px;
     text-decoration: none;
     cursor: pointer;
-    border: none;
-    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    transition: background .15s ease, box-shadow .15s ease;
+    font-family: inherit;
+    line-height: 1.4;
 }
+
+.owpm-btn:disabled { opacity: .55; cursor: not-allowed; }
 
 .owpm-btn-primary,
 a.owpm-btn-primary {
     background: #2271b1;
     color: #fff !important;
-    box-shadow: 0 2px 5px rgba(34, 113, 177, 0.3);
+    box-shadow: 0 1px 3px rgba(34, 113, 177, .35);
 }
 
-.owpm-btn-primary:hover,
-a.owpm-btn-primary:hover {
-    background: #135e96;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(34, 113, 177, 0.4);
-}
+.owpm-btn-primary:hover:not(:disabled),
+a.owpm-btn-primary:hover { background: #135e96; }
 
 .owpm-btn-secondary {
-    background: #f0f0f1;
-    color: #2c3338;
-    border: 1px solid #8c8f94;
+    background: #fff;
+    color: #2271b1;
+    border-color: #2271b1;
 }
 
-.owpm-btn-secondary:hover {
-    background: #dcdcde;
-}
+.owpm-btn-secondary:hover:not(:disabled) { background: #f0f6fc; }
 
-/* Progress bar */
+/* Progress ------------------------------------------------------------ */
+
 .owpm-progress-wrapper {
-    margin-top: 30px;
+    margin-top: 16px;
     background: #f0f0f1;
     border-radius: 20px;
-    height: 24px;
+    height: 20px;
     overflow: hidden;
     display: none;
 }
 
 .owpm-progress-bar {
-    background: linear-gradient(90deg, #2271b1, #3b8deb);
+    background: linear-gradient(90deg, #2271b1, #4f94d4);
     height: 100%;
-    width: 0%;
-    transition: width 0.3s ease;
+    width: 0;
+    transition: width .3s ease;
 }
 
+.owpm-progress-bar.owpm-progress-error { background: #d63638; }
+.owpm-progress-bar.owpm-progress-done { background: #00a32a; }
+
 .owpm-status-text {
-    margin-top: 10px;
+    margin-top: 11px;
     font-weight: 500;
     color: #1d2327;
     display: none;
+    font-size: 13px;
 }
 
-/* File Upload Area */
+.owpm-detail {
+    display: block;
+    font-size: 11px;
+    color: #8c8f94;
+    font-weight: 400;
+    margin-top: 5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: Consolas, Monaco, monospace;
+}
+
+.owpm-note {
+    font-size: 13px;
+    color: #50575e;
+    font-weight: 400;
+    margin: 9px 0;
+}
+
+.owpm-error { color: #d63638; font-weight: 500; }
+.owpm-muted { color: #8c8f94; }
+
+.owpm-warn {
+    color: #8a6d1f;
+    background: #fcf9e8;
+    border-left: 3px solid #dba617;
+    padding: 8px 12px;
+    border-radius: 0 4px 4px 0;
+}
+
+/* Post-import checklist ----------------------------------------------- */
+
+.owpm-done-card {
+    background: #edfaef;
+    border: 1px solid #b8e6c1;
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin-top: 16px;
+}
+
+.owpm-done-card h3 {
+    margin: 0 0 10px;
+    font-size: 16px;
+    color: #00622e;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.owpm-done-card h3 .dashicons { color: #00a32a; }
+
+.owpm-checklist {
+    margin: 12px 0 0;
+    padding-left: 20px;
+    font-size: 13px;
+    line-height: 1.85;
+    color: #2c3338;
+    font-weight: 400;
+    list-style: decimal;
+}
+
+.owpm-stats {
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+    padding: 12px 0;
+    border-top: 1px solid #b8e6c1;
+    border-bottom: 1px solid #b8e6c1;
+}
+
+.owpm-stat-n {
+    display: block;
+    font-size: 19px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.owpm-stat-l {
+    font-size: 11px;
+    color: #646970;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    font-weight: 500;
+}
+
+.owpm-errors {
+    margin: 12px 0;
+    font-weight: 400;
+    font-size: 12px;
+    background: #fcf9e8;
+    border: 1px solid #f0e6bd;
+    border-radius: 4px;
+    padding: 10px 12px;
+}
+
+.owpm-errors summary { cursor: pointer; color: #8a6d1f; font-weight: 600; }
+
+.owpm-errors ul {
+    margin: 10px 0 0;
+    padding-left: 18px;
+    color: #6d6a5f;
+    word-break: break-word;
+}
+
+/* Upload area --------------------------------------------------------- */
+
 .owpm-upload-area {
-    border: 3px dashed #c3c4c7;
-    border-radius: 12px;
-    padding: 60px 20px;
+    border: 2px dashed #c3c4c7;
+    border-radius: 10px;
+    padding: 30px 20px;
     text-align: center;
-    background: #f9f9f9;
-    margin: 30px 0;
-    transition: all 0.3s ease;
-    position: relative;
+    background: #fafafa;
+    margin: 0;
+    transition: border-color .15s ease, background .15s ease;
+}
+
+.owpm-upload-area:hover { border-color: #2271b1; background: #f0f6fc; }
+
+/* Applied while a file is dragged over the zone. */
+.owpm-upload-area.owpm-dragover {
+    border-color: #2271b1;
+    background: #e5f0f9;
+    border-style: solid;
 }
 
 .owpm-upload-icon {
-    font-size: 48px;
+    font-size: 34px;
+    width: 34px;
+    height: 34px;
     color: #a7aaad;
-    margin-bottom: 15px;
+    margin: 0 auto 8px;
     display: block;
 }
 
-.owpm-upload-area:hover {
-    border-color: #2271b1;
-    background: #f0f6fc;
+.owpm-drop-title {
+    font-size: 16px;
+    color: #1d2327;
+    margin: 0 0 4px;
+    font-weight: 600;
 }
 
-.owpm-upload-area input[type="file"] {
-    display: none;
+.owpm-drop-sub {
+    margin: 0 0 18px;
+    font-size: 13px;
+    color: #646970;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
+.owpm-upload-area input[type="file"] { display: none; }
+
+/* Backups table ------------------------------------------------------- */
+
+.owpm-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: 13px;
+}
+
+.owpm-table thead tr { background: #f6f7f7; }
+
+.owpm-table th,
+.owpm-table td {
+    padding: 11px 14px;
+    color: #50575e;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.owpm-table th { font-weight: 600; color: #1d2327; }
+.owpm-table tbody tr:last-child td { border-bottom: none; }
+
+.owpm-table .owpm-name {
+    font-weight: 500;
+    color: #1d2327;
+    word-break: break-all;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+}
+
+.owpm-empty {
+    padding: 32px 20px;
+    background: #f6f7f7;
+    border-radius: 8px;
+    text-align: center;
+    color: #8c8f94;
+}
+
+.owpm-credit {
+    text-align: center;
+    margin: 16px 0 0;
+    font-size: 12px;
+    color: #8c8f94;
+}
+
+.owpm-credit a { color: #2271b1; text-decoration: none; }
+.owpm-credit a:hover { text-decoration: underline; }
+
+/* Modal ---------------------------------------------------------------- */
+
+.owpm-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(28, 32, 39, .6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Above wp-admin's own toolbar (99100) so it is never partially covered. */
+    z-index: 160000;
+    padding: 20px;
+    animation: owpmFade .15s ease;
+}
+
+body.owpm-modal-open { overflow: hidden; }
+
+.owpm-modal {
+    background: #fff;
+    border-radius: 10px;
+    max-width: 480px;
+    width: 100%;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .3);
+    overflow: hidden;
+    animation: owpmModalIn .18s ease;
+}
+
+.owpm-modal h2 {
+    margin: 0;
+    padding: 20px 24px 12px;
+    font-size: 17px;
+    font-weight: 600;
+    color: #1d2327;
+    line-height: 1.35;
+}
+
+.owpm-modal-danger h2 { color: #8a1f22; }
+
+.owpm-modal-body {
+    padding: 0 24px 4px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #50575e;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.owpm-modal-body p { margin: 0 0 12px; }
+
+.owpm-modal-body p:first-child { color: #1d2327; }
+
+.owpm-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 24px 20px;
+    background: #f6f7f7;
+    border-top: 1px solid #f0f0f1;
+    margin-top: 12px;
+}
+
+.owpm-modal-actions .owpm-btn { padding: 9px 18px; font-size: 14px; }
+
+.owpm-btn-danger {
+    background: #d63638;
+    color: #fff !important;
+    box-shadow: 0 1px 3px rgba(214, 54, 56, .35);
+}
+
+.owpm-btn-danger:hover:not(:disabled) { background: #b32d2e; }
+
+.owpm-modal-actions .owpm-btn:focus-visible {
+    outline: 2px solid #1d2327;
+    outline-offset: 2px;
+}
+
+@keyframes owpmModalIn {
+    from { opacity: 0; transform: translateY(-8px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes owpmFade {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@media screen and (max-width: 782px) {
+    .owpm-panels { padding: 24px 18px 30px; }
+    .owpm-header { padding: 22px; }
+    .owpm-tab span.dashicons { display: none; }
+    .owpm-status-grid { grid-template-columns: 1fr; }
 }

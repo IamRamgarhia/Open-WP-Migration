@@ -1,21 +1,25 @@
 <div align="center">
 
-# Open WP Migration — Unlimited Site Transfer & Backup
+# Open WP Migration — Free WordPress Migration Plugin with No Size Limit
 
-### The only WordPress migration and backup plugin you'll never have to pay for.
+### Migrate, clone and back up any WordPress site for free — a genuinely unlimited alternative to paid migration plugins.
 
 [![License: GPLv2](https://img.shields.io/badge/License-GPLv2-green.svg)](readme.txt)
 [![WordPress](https://img.shields.io/badge/WordPress-Ready-blue.svg?logo=wordpress)](#quick-start--installation)
-[![Version](https://img.shields.io/badge/Version-1.1.4-orange.svg)](https://github.com/IamRamgarhia/open-migration/releases)
-[![PHP](https://img.shields.io/badge/PHP-7.4+-777BB4.svg?logo=php)](#quick-start--installation)
-[![GitHub Stars](https://img.shields.io/github/stars/IamRamgarhia/open-migration?style=social)](https://github.com/IamRamgarhia/open-migration)
+[![Version](https://img.shields.io/badge/Version-1.3.5-orange.svg)](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup/releases)
+[![PHP](https://img.shields.io/badge/PHP-7.2+-777BB4.svg?logo=php)](#quick-start--installation)
+[![GitHub Stars](https://img.shields.io/github/stars/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup?style=social)](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup)
 [![Cost](https://img.shields.io/badge/Cost-100%25%20Free-brightgreen.svg)](#why-choose-open-migration)
 
-**Migrate massive 5GB+ websites, perform complete backups, and automatically search & replace URLs — all without paying a single cent. Ever.**
+**Move a WordPress site to a new host, clone it to staging, or restore a full backup — with no upload size limit, no premium extension and no account.**
 
-Your site data never leaves your server. No cloud dependencies. No hidden limits. Open-source and offline-first.
+Import a 5GB+ site on shared hosting. Site URLs, server paths and even a different database table prefix are converted automatically, including inside serialised data that a plain find-and-replace would corrupt.
 
-[Download Now](https://github.com/IamRamgarhia/open-migration/archive/refs/heads/master.zip) &nbsp;|&nbsp; [Screenshots](#screenshots) &nbsp;|&nbsp; [5-Minute Quick Start](#your-first-backup-in-5-minutes) &nbsp;|&nbsp; [Report Bug](https://github.com/IamRamgarhia/open-migration/issues) &nbsp;|&nbsp; [Request Feature](https://github.com/IamRamgarhia/open-migration/issues)
+Your data never leaves your server. No cloud dependency, no tracking, no paid tier. Open source under GPLv2.
+
+**Looking for:** a free All-in-One WP Migration alternative · a way to import a large WordPress backup without buying an extension · a Duplicator or UpdraftPlus alternative that does search-replace for free · a plugin to move WordPress from staging to live without breaking serialised data? That is what this is.
+
+[Documentation](https://dicecodes.com/open-migration/) &nbsp;|&nbsp; [Download Now](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup/releases/latest) &nbsp;|&nbsp; [Screenshots](#screenshots) &nbsp;|&nbsp; [5-Minute Quick Start](#your-first-backup-in-5-minutes) &nbsp;|&nbsp; [Report Bug](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup/issues) &nbsp;|&nbsp; [Request Feature](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup/issues)
 
 </div>
 
@@ -76,11 +80,11 @@ Your site data never leaves your server. No cloud dependencies. No hidden limits
 A step-by-step guide for creating your very first full-site backup. Targeted at users who want to safely export their site before making changes.
 
 ### Before you start
-You need: A WordPress website (PHP 7.4 or higher). **No coding knowledge required.**
+You need: A WordPress website running PHP 7.2 or higher with the ZipArchive extension enabled. The Export tab runs a server check and tells you if anything is missing. **No coding knowledge required.**
 
 ### Step 1 — Install (1 minute)
 
-1. Download the project as a ZIP from [this link](https://github.com/IamRamgarhia/open-migration/archive/refs/heads/master.zip) or the Releases page.
+1. Download the project as a ZIP from [this link](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup/archive/refs/heads/master.zip) or the Releases page.
 2. Go to your WordPress Admin Dashboard → **Plugins** → **Add New** → **Upload Plugin**.
 3. Choose the downloaded `open-migration.zip` file.
 4. Click **Install Now** and then **Activate**.
@@ -89,9 +93,10 @@ You need: A WordPress website (PHP 7.4 or higher). **No coding knowledge require
 
 1. Click on **Open Migration** in your WordPress sidebar.
 2. You will land on the **Export** tab.
-3. Review the checklist of what will be exported (Database, Plugins, Themes, Uploads).
-4. Click the large **Export Site** button.
-5. Watch the real-time progress bar as it safely packages your entire site into a `.zip` archive.
+3. Check the **Server check** panel at the top — it confirms ZipArchive is available, the backup folder is writable, and you have enough disk space.
+4. Review the "Included / Not included" lists so you know exactly what is being packaged.
+5. Click **Start Export**.
+6. Watch the progress bar as it packages your site into a `.zip`, one batch at a time.
 
 ### Step 3 — Download or Manage (1 minute)
 
@@ -111,8 +116,9 @@ Most WordPress migration plugins — All-in-One WP Migration, Duplicator, Updraf
 
 - **Completely free** — no premium tier, no paid extensions, no hidden charges.
 - **ZERO file size limits** — whether your site is 50MB or 50GB, we migrate it for free.
-- **Your data stays on YOUR server** — backups are stored securely in `wp-content/uploads/owpm-backups`. No cloud tracking.
-- **Beautiful, native UI** — built with modern React-like architecture that feels blazing fast.
+- **Your data stays on YOUR server** — backups are stored in `wp-content/uploads/owpm-backups`. No cloud tracking.
+- **Restores onto a fresh WordPress** — site URL, server paths and even a different table prefix are converted for you.
+- **Lightweight, native UI** — plain JavaScript, no build step, no framework payload.
 - **Install once, use forever** — GPLv2 licensed, open-source, community-driven.
 
 > **If you're paying to move your own data, you can stop now.**
@@ -124,7 +130,9 @@ Most WordPress migration plugins — All-in-One WP Migration, Duplicator, Updraf
 | **Price** | ✅ **Free forever** | Freemium | Freemium | Freemium |
 | **Import Size Limit** | ✅ **Unlimited** | 512MB limit | Limited | Limited |
 | **Database Search & Replace** | ✅ Automatic | ✅ | ✅ | ⚠ Paid feature |
-| **Direct Site-to-Site Transfer** | 🚀 Coming Soon | ⚠ Paid Extension | ⚠ Paid Version | ⚠ Paid Version |
+| **Table Prefix Conversion** | ✅ Automatic | ✅ | ✅ | ⚠ Paid feature |
+| **Direct Site-to-Site Transfer** | ✅ Yes | ⚠ Paid Extension | ⚠ Paid Version | ⚠ Paid Version |
+| **Change Domain After DNS Switch** | ✅ Yes, with DNS safety check | ⚠ Manual | ⚠ Manual | ⚠ Manual |
 | **Cloud Storage (Drive/Dropbox)** | 🚀 Coming Soon | ⚠ Paid Extensions | ⚠ Paid Version | ⚠ Paid Version |
 | **Multisite Support** | 🚀 Coming Soon | ⚠ Paid Extension | ⚠ Paid Version | ⚠ Paid Version |
 | **Real-time Zipping Progress** | ✅ Yes | ✅ | ✅ | ⚠ Basic |
@@ -139,12 +147,14 @@ Most WordPress migration plugins — All-in-One WP Migration, Duplicator, Updraf
 ### :outbox_tray: Migration & Export
 - **One-Click Export:** Package your Database, Themes, Plugins, Uploads, and Metadata into a single standard `.zip` file.
 - **Real-Time Tracking:** Watch exactly which file is being zipped with our real-time UI tracking so you never wonder if the process stalled.
+- **Resumable Batches:** The database dump and file archive run in small batches sized to your server, so exports never time out.
 - **Selective Exporting (Coming soon):** Choose to exclude media files, spam comments, or specific plugins.
 
 ### :inbox_tray: Import & Restoration
 - **Bypass PHP Upload Limits:** Built-in chunking allows you to upload massive files even if your web host restricts `upload_max_filesize`.
-- **Automatic Search & Replace:** Intelligently finds your old domain and replaces it with the new domain in the database, ensuring serialized data isn't broken.
-- **Raw SQL Import:** Restores your database efficiently using robust SQL execution, completely bypassing standard WP parsing bottlenecks.
+- **Automatic Search & Replace:** Finds your old domain and replaces it everywhere — including inside PHP-serialised values (length prefixes are recalculated, so nothing breaks), JSON-escaped block markup, URL-encoded links and protocol-relative references.
+- **Table Prefix Conversion:** Importing a `wp_oldsite_` database into an install that uses `wp_`? Tables, option names and user meta keys are all converted during the restore.
+- **Resumable Restore:** Extraction, the SQL import and the URL rewrite all run in short batches that pick up where they left off, so large sites cannot time out.
 
 ### :briefcase: Backup Management
 - **Centralized Dashboard:** View all your past `.zip` exports directly within WordPress.
@@ -163,8 +173,11 @@ Most WordPress migration plugins — All-in-One WP Migration, Duplicator, Updraf
 **Q: How does this compare to Duplicator or UpdraftPlus?**  
 **A:** Duplicator requires you to manage `installer.php` files and manually create databases. UpdraftPlus charges for basic features like database search and replace. Open Migration is a single-click solution inside WordPress that handles the database replacement automatically for free.
 
-**Q: Where are my backups stored?**  
-**A:** Backups are securely generated in your `wp-content/uploads/owpm-backups` directory. An `.htaccess` and `index.php` file are automatically generated to prevent unauthorized external access to your ZIP files.
+**Q: Where are my backups stored, and can anyone else download them?**  
+**A:** In `wp-content/uploads/owpm-backups`. The folder gets deny-all rules for Apache 2.2, Apache 2.4 and IIS plus an index file, and archive names include 32 random characters. Most importantly, downloads are streamed through WordPress only after a capability and nonce check, so the folder never has to be publicly readable — which is what keeps backups safe on Nginx, where `.htaccess` files are ignored entirely.
+
+**Q: Why am I logged out after importing?**  
+**A:** The archive brings its own user accounts, which replace the ones on the destination — that invalidates your session. Log back in with the username and password from the **original** site. If your account exists on both with administrator rights, the plugin signs you back in automatically.
 
 **Q: Does this work on WordPress Multisite?**  
 **A:** Not yet, but Multisite support is our top priority for the next major release—and it will be 100% free when it launches!
@@ -185,7 +198,9 @@ Because your data belongs to you. The WordPress ecosystem was built on the back 
 
 **Privacy:** Open Migration is strictly offline-first. Your data is compressed locally on your server. We do not track you, we do not require you to create an account, and we absolutely do not send your website data to our servers.
 
-**Security:** We automatically inject security files (`.htaccess` and `index.html`) into the backup directory to prevent directory browsing and direct file downloads by unauthorized users.
+**Security:** The backup directory is protected with deny-all rules for Apache and IIS plus index files to prevent directory browsing, and every backup download is served through WordPress behind a capability and nonce check rather than as a directly reachable file. Imported archives are validated entry by entry before extraction, so a malicious `.zip` cannot write outside `wp-content`. Every admin action requires the `manage_options` capability and a valid nonce.
+
+**Note on site-to-site transfers:** this is the only feature that makes an outbound connection, and only to the address contained in the token you paste. Nothing is ever sent to the plugin author.
 
 ---
 
@@ -200,6 +215,6 @@ We strongly believe in community-driven development! If you want to help make Op
 
 ## Contact & Support
 
-If you found a bug or have a feature request, please [open an issue on GitHub](https://github.com/IamRamgarhia/open-migration/issues). 
+If you found a bug or have a feature request, please [open an issue on GitHub](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup/issues). 
 
 *Made with ❤️ for the WordPress Community.*

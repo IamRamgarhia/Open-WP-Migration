@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Open Migration Docs — Free Unlimited WordPress Migration</title>
+<meta name="description" content="Free WordPress migration plugin with no upload size limit. Move, clone or restore a site — URLs, paths and table prefixes convert automatically.">
+<link rel="canonical" href="https://dicecodes.com/open-migration/">
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+<meta name="author" content="DiceCodes">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="DiceCodes">
+<meta property="og:title" content="Open Migration — Free Unlimited WordPress Migration Plugin">
+<meta property="og:description" content="Move, clone and restore any WordPress site with no upload size limit. URLs, server paths and table prefixes are converted automatically. Free and open source.">
+<meta property="og:url" content="https://dicecodes.com/open-migration/">
+<meta property="og:locale" content="en_US">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Open Migration — Free Unlimited WordPress Migration Plugin">
+<meta name="twitter:description" content="Move, clone and restore any WordPress site with no upload size limit. Free and open source.">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Open Migration – Unlimited Site Transfer & Backup",
+      "applicationCategory": "BrowserApplication",
+      "operatingSystem": "WordPress 5.6 or newer, PHP 7.2 or newer",
+      "softwareVersion": "1.3.4",
+      "description": "A free and open source WordPress migration and backup plugin. Exports a complete site to a single .zip and restores it onto any other WordPress install, converting site URLs, server paths and database table prefixes automatically. Chunked uploads remove the host's file size limit.",
+      "url": "https://dicecodes.com/open-migration/",
+      "author": { "@type": "Organization", "name": "DiceCodes", "url": "https://dicecodes.com/" },
+      "license": "https://www.gnu.org/licenses/gpl-2.0.html",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "featureList": [
+        "Unlimited import and export file size",
+        "Automatic URL and server path replacement",
+        "Automatic database table prefix conversion",
+        "Serialisation-safe search and replace",
+        "Direct site-to-site transfer over the REST API",
+        "Change site domain after DNS is switched",
+        "Resumable batches so large sites never time out"
+      ]
+    },
+    {
+      "@type": "HowTo",
+      "name": "How to migrate a WordPress site to a new host for free",
+      "description": "Export a full WordPress site to a .zip, restore it onto a new install, and switch the domain once DNS is pointed.",
+      "totalTime": "PT30M",
+      "tool": [{ "@type": "HowToTool", "name": "Open Migration plugin" }],
+      "step": [
+        { "@type": "HowToStep", "name": "Export the old site", "text": "On the old site, open Open Migration, go to the Export tab, run the server check and click Start Export. Download the .zip when it finishes.", "url": "https://dicecodes.com/open-migration/#export" },
+        { "@type": "HowToStep", "name": "Install WordPress on the new host", "text": "A brand new, empty WordPress install is fine. Install and activate Open Migration on it.", "url": "https://dicecodes.com/open-migration/#import" },
+        { "@type": "HowToStep", "name": "Import the archive", "text": "On the new site, open the Import tab and drag the .zip onto the upload area. Files, database, URLs, server paths and the table prefix are all handled automatically.", "url": "https://dicecodes.com/open-migration/#import" },
+        { "@type": "HowToStep", "name": "Log in with the old site's account", "text": "The archive brings its own user accounts, so sign in using the original site's username and password, then re-save Settings then Permalinks.", "url": "https://dicecodes.com/open-migration/#after-import" },
+        { "@type": "HowToStep", "name": "Switch the domain after DNS is pointed", "text": "If you imported on a temporary address, point DNS at the new server, then use the Change Domain tab to rewrite the site to its real address.", "url": "https://dicecodes.com/open-migration/#change-domain" }
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": "Is there a file size limit when importing a WordPress site?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. The archive is sliced into small chunks in the browser and reassembled on the server, so upload_max_filesize and post_max_size never apply. Multi-gigabyte sites import on ordinary shared hosting." } },
+        { "@type": "Question", "name": "Do I have to change URLs manually after migrating WordPress?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Every reference to the old domain is rewritten during the import, including inside PHP-serialised option values, JSON-escaped block markup, URL-encoded links and protocol-relative references." } },
+        { "@type": "Question", "name": "Can I import a site whose database used a different table prefix?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. The prefix is recorded in the archive and converted during the restore, including the prefixed keys stored inside the options and usermeta tables." } },
+        { "@type": "Question", "name": "How do I migrate WordPress before pointing DNS at the new host?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Import onto the host's temporary address so the site works there immediately. Once DNS is pointed at the new server, use the Change Domain tab to rewrite the site to its real domain. A built-in DNS check confirms the address really resolves to the new server before anything is written." } },
+        { "@type": "Question", "name": "Why am I logged out after importing a WordPress backup?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Restoring the database replaces the destination's user accounts, which invalidates the current session. Log back in with the username and password from the original site." } },
+        { "@type": "Question", "name": "Is Open Migration really free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. It is GPLv2 licensed with no paid tier, no premium extensions, no feature gates and no data collection. Unlimited file size is included rather than sold separately." } }
+      ]
+    }
+  ]
+}
+</script>
+
+<style>
+:root{
+  --ink:#1d2327; --body:#4a5158; --muted:#6b7177; --line:#e3e5e8;
+  --blue:#2271b1; --blue-dark:#12508c; --bg:#fff; --soft:#f6f8fa;
+  --green:#00733f; --amber:#8a6d1f; --red:#c1272d;
+  --max:860px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:1.5rem}
+body{
+  margin:0;background:var(--bg);color:var(--body);
+  font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 20px}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+h1,h2,h3,h4{color:var(--ink);line-height:1.25;margin:0}
+h1{font-size:2.1rem;font-weight:700;letter-spacing:-.02em}
+h2{font-size:1.5rem;font-weight:650;margin:3rem 0 .75rem;letter-spacing:-.01em}
+h3{font-size:1.13rem;font-weight:650;margin:1.9rem 0 .5rem}
+p{margin:0 0 1rem}
+code{background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:.1em .4em;font-size:.87em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre{background:#1d2327;color:#e8eaed;padding:16px 18px;border-radius:8px;overflow-x:auto;font-size:.85rem;line-height:1.6}
+pre code{background:none;border:0;padding:0;color:inherit}
+
+header.hero{background:linear-gradient(160deg,#12365c 0%,#2271b1 100%);color:#fff;padding:56px 0 48px}
+header.hero h1{color:#fff}
+.tagline{font-size:1.16rem;color:rgba(255,255,255,.9);margin:.8rem 0 1.5rem;max-width:60ch}
+.badges{display:flex;flex-wrap:wrap;gap:8px}
+.badge{background:rgba(255,255,255,.15);border-radius:20px;padding:5px 13px;font-size:.8rem;font-weight:600}
+
+/* Two columns: content, then a sticky nav on the right. Main comes first in
+   the source so reading order and crawling stay correct. */
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 232px;gap:48px;align-items:start;max-width:1080px}
+.side{position:sticky;top:24px;padding-top:2.5rem}
+
+nav.toc h2{margin:0 0 .7rem;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+nav.toc ol{margin:0;padding:0;list-style:none;border-left:2px solid var(--line)}
+nav.toc li{margin:0}
+nav.toc a{
+  display:block;padding:.34rem 0 .34rem .9rem;margin-left:-2px;
+  border-left:2px solid transparent;font-size:.855rem;line-height:1.4;
+  color:var(--muted);transition:color .12s ease,border-color .12s ease
+}
+nav.toc a:hover{color:var(--blue);text-decoration:none}
+nav.toc a.active{color:var(--blue);border-left-color:var(--blue);font-weight:600}
+
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;gap:0;max-width:var(--max)}
+  .side{position:static;padding-top:2rem;order:-1}
+  nav.toc{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:18px 22px}
+  nav.toc ol{border-left:0;columns:2;column-gap:1.6rem}
+  nav.toc a{padding:.22rem 0;border-left:0;margin-left:0}
+  nav.toc a.active{border-left:0}
+}
+@media(max-width:560px){nav.toc ol{columns:1}}
+
+.lead{font-size:1.08rem;color:var(--ink)}
+ul,ol{padding-left:1.3rem}
+li{margin:.4rem 0}
+
+table{width:100%;border-collapse:collapse;margin:1.2rem 0;font-size:.94rem}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--ink);font-weight:650;background:var(--soft)}
+.yes{color:var(--green);font-weight:600}
+.no{color:var(--muted)}
+
+.note{border-left:4px solid var(--blue);background:#f1f7fc;padding:14px 18px;border-radius:0 8px 8px 0;margin:1.3rem 0}
+.warn{border-left:4px solid var(--red);background:#fdf2f2;padding:14px 18px;border-radius:0 8px 8px 0;margin:1.3rem 0}
+.tip{border-left:4px solid var(--green);background:#f0faf4;padding:14px 18px;border-radius:0 8px 8px 0;margin:1.3rem 0}
+.note p:last-child,.warn p:last-child,.tip p:last-child{margin-bottom:0}
+
+.steps{list-style:none;padding:0;counter-reset:s}
+.steps>li{counter-increment:s;position:relative;padding:0 0 1.1rem 2.6rem;margin:0}
+.steps>li::before{
+  content:counter(s);position:absolute;left:0;top:1px;width:1.7rem;height:1.7rem;
+  background:var(--blue);color:#fff;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:.82rem;font-weight:700
+}
+.steps>li strong{color:var(--ink);display:block;margin-bottom:.15rem}
+
+details{border:1px solid var(--line);border-radius:8px;padding:0;margin:.6rem 0}
+summary{cursor:pointer;padding:13px 16px;font-weight:600;color:var(--ink);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸ ";color:var(--blue)}
+details[open] summary::before{content:"▾ "}
+details .inner{padding:0 16px 14px;border-top:1px solid var(--line);margin-top:-1px;padding-top:12px}
+details .inner p:last-child{margin-bottom:0}
+
+footer{margin-top:4rem;border-top:1px solid var(--line);padding:28px 0 44px;color:var(--muted);font-size:.9rem}
+footer a{font-weight:600}
+.skip{position:absolute;left:-9999px}
+.skip:focus{left:12px;top:12px;background:#fff;padding:10px 16px;border-radius:6px;z-index:10}
+</style>
+</head>
+
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Open Migration — free unlimited WordPress migration plugin</h1>
+    <p class="tagline">
+      Move, clone, back up and restore any WordPress site with no upload size limit.
+      Site URLs, server paths and database table prefixes are converted for you.
+    </p>
+    <div class="badges">
+      <span class="badge">100% free &amp; open source</span>
+      <span class="badge">GPLv2</span>
+      <span class="badge">No file size cap</span>
+      <span class="badge">No account required</span>
+      <span class="badge">v1.3.4</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap layout">
+<main id="main">
+
+  <section id="what">
+    <h2>What Open Migration does</h2>
+    <p class="lead">
+      Open Migration copies a complete WordPress site — database, themes, plugins, uploads —
+      into a single <code>.zip</code> archive, and restores that archive onto any other
+      WordPress install.
+    </p>
+    <p>
+      Both the export and the import run in small batches over AJAX. Nothing is held in memory
+      all at once, and no single request runs long enough to time out, so multi-gigabyte sites
+      migrate successfully on ordinary shared hosting.
+    </p>
+
+    <h3>Restoring onto a brand new WordPress install</h3>
+    <p>You do not have to prepare the destination. Install WordPress, install this plugin,
+       upload the archive, and the differences are worked out for you:</p>
+    <ul>
+      <li><strong>Site URL</strong> — every reference to the old domain is rewritten, including
+          inside PHP-serialised option values, JSON-escaped block markup, URL-encoded links and
+          protocol-relative references.</li>
+      <li><strong>Server paths</strong> — absolute paths stored by page builders and cache
+          plugins are updated to the new document root.</li>
+      <li><strong>Table prefix</strong> — if the old site used <code>wp_abc_</code> and the new
+          one uses <code>wp_</code>, every table, option name and user meta key is converted.</li>
+      <li><strong>Serialised data</strong> — values are unserialised, replaced and re-serialised
+          so string length prefixes stay correct. A naive find-and-replace corrupts these.</li>
+    </ul>
+  </section>
+
+  <section id="alternative">
+    <h2>A free alternative to paid WordPress migration plugins</h2>
+    <p>
+      Most WordPress migration plugins are free until your site grows. The moment an import
+      exceeds a certain size, or you want a direct server-to-server transfer, you are asked to
+      buy an extension. Open Migration includes those capabilities in the free plugin.
+    </p>
+
+    <table>
+      <caption class="skip">Feature comparison</caption>
+      <thead>
+        <tr><th scope="col">Capability</th><th scope="col">Open Migration</th><th scope="col">Typical freemium migration plugin</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Import file size limit</td><td class="yes">Unlimited, included</td><td class="no">Paid extension</td></tr>
+        <tr><td>Direct site-to-site transfer</td><td class="yes">Included</td><td class="no">Paid version</td></tr>
+        <tr><td>Automatic URL replacement</td><td class="yes">Included</td><td class="no">Usually included</td></tr>
+        <tr><td>Table prefix conversion</td><td class="yes">Included</td><td class="no">Varies</td></tr>
+        <tr><td>Change domain after DNS switch</td><td class="yes">Included, with a DNS safety check</td><td class="no">Manual search &amp; replace</td></tr>
+        <tr><td>Account or sign-up required</td><td class="yes">Never</td><td class="no">Often</td></tr>
+        <tr><td>Data sent to a third party</td><td class="yes">None</td><td class="no">Varies</td></tr>
+        <tr><td>Licence</td><td class="yes">GPLv2, open source</td><td class="no">Proprietary core</td></tr>
+      </tbody>
+    </table>
+
+    <p class="note">
+      Looking for a free alternative to a size-capped migration plugin, a way to import a large
+      WordPress backup without buying an extension, or a plugin that will move a site from
+      staging to live without breaking serialised data? That is what this is for.
+    </p>
+  </section>
+
+  <section id="requirements">
+    <h2>Requirements</h2>
+    <ul>
+      <li>WordPress 5.6 or newer</li>
+      <li>PHP 7.2 or newer with the <strong>ZipArchive</strong> extension enabled</li>
+      <li>Enough free disk space for the archive alongside the site it copies</li>
+      <li>A single-site install — multisite networks are detected and refused rather than
+          partially migrated</li>
+    </ul>
+    <p>The Export tab runs a server check before you start and tells you if anything is missing,
+       so you find out up front rather than halfway through a large export.</p>
+  </section>
+
+  <section id="install">
+    <h2>Installing the plugin</h2>
+    <ol class="steps">
+      <li><strong>Upload the plugin</strong>
+          In WordPress, go to Plugins → Add New → Upload Plugin and choose the
+          <code>.zip</code>.</li>
+      <li><strong>Activate it</strong>
+          Open Migration appears in the admin sidebar.</li>
+      <li><strong>Install it on both sites</strong>
+          The plugin is needed on the site you are moving <em>from</em> and the site you are
+          moving <em>to</em>.</li>
+    </ol>
+  </section>
+
+  <section id="export">
+    <h2>Exporting a WordPress site</h2>
+    <ol class="steps">
+      <li><strong>Open the Export tab and check the server report</strong>
+          It confirms ZipArchive is available, the backup folder is writable, and there is
+          enough free disk space.</li>
+      <li><strong>Click Start Export</strong>
+          The database is dumped and files are zipped in small batches, so the request never
+          times out. Progress shows which file is being packaged.</li>
+      <li><strong>Download the archive</strong>
+          It also stays on the server under the Backups tab until you delete it.</li>
+    </ol>
+
+    <h3>What is included in the backup</h3>
+    <table>
+      <thead><tr><th scope="col">Included</th><th scope="col">Not included</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>All database tables for this site's prefix</td>
+          <td><code>wp-config.php</code> and your database password</td>
+        </tr>
+        <tr><td>Themes and plugins</td><td>WordPress core files</td></tr>
+        <tr><td>Uploads and the media library</td><td>Cache, upgrade and transient data</td></tr>
+        <tr><td>Site URL, server path and table prefix, for automatic conversion</td>
+            <td>Other plugins' backup folders</td></tr>
+      </tbody>
+    </table>
+    <p class="tip">
+      Because <code>wp-config.php</code> is never included or overwritten, the destination keeps
+      its own database credentials and security keys. That is what makes restoring onto a fresh
+      install safe.
+    </p>
+  </section>
+
+  <section id="import">
+    <h2>Importing onto a new WordPress install</h2>
+    <div class="warn">
+      <p><strong>An import replaces the destination site.</strong> Its posts, users, themes,
+      plugins and media are overwritten by the contents of the archive, and it cannot be undone.
+      Export a backup of the destination first if you might need it.</p>
+    </div>
+
+    <ol class="steps">
+      <li><strong>Add the archive</strong>
+          Drag the <code>.zip</code> onto the upload area, or click Select File. It is uploaded
+          in small chunks, so your host's upload limit does not apply.</li>
+      <li><strong>The restore runs automatically</strong>
+          Files are extracted, the database is restored, and then the old site URL, server path
+          and table prefix are converted to match this install.</li>
+      <li><strong>Sign in with the original site's account</strong>
+          The archive brings its own users, so your current login stops working.</li>
+    </ol>
+  </section>
+
+  <section id="after-import">
+    <h2>What to do after an import</h2>
+    <ol>
+      <li>Log in using the <strong>original</strong> site's username and password.</li>
+      <li>Open <strong>Settings → Permalinks</strong> and click Save Changes once, to rebuild
+          the URL rules.</li>
+      <li>Visit the front page and check that images and links load.</li>
+      <li>Clear any caching plugin or server cache.</li>
+      <li>Delete the leftover backup from the Backups tab once you are happy.</li>
+    </ol>
+    <p class="note">
+      If your account exists on both sites with administrator rights, the plugin signs you back
+      in automatically and you can skip step 1.
+    </p>
+  </section>
+
+  <section id="change-domain">
+    <h2>Migrating WordPress before you switch DNS</h2>
+    <p>
+      Most real migrations happen while the domain still points at the old host, so you work on
+      the new server through a temporary address — <code>site.yourhost.com</code>, a staging
+      subdomain, or a raw IP address.
+    </p>
+    <p>
+      That is fine. Import onto the temporary address and the site works there straight away.
+      Then, once DNS is pointed and the real domain loads the new server, open the
+      <strong>Change Domain</strong> tab and enter the real address.
+    </p>
+
+    <div class="note">
+      <p><strong>This step cannot be automatic.</strong> WordPress only ever sees the hostname a
+      visitor requested, so it has no way of knowing DNS was switched. It will keep redirecting
+      visitors back to the temporary address until you tell it otherwise.</p>
+    </div>
+
+    <h3>The DNS safety check</h3>
+    <p>
+      Changing the address <em>before</em> DNS resolves leaves the site unreachable at both
+      domains. Click <strong>Check DNS</strong> first: the plugin requests the new address with a
+      one-time token and looks for its own marker in the response, which proves the domain
+      genuinely resolves to this server. You get one of three answers:
+    </p>
+    <ul>
+      <li><strong>Confirmed</strong> — the address points here, safe to continue.</li>
+      <li><strong>Not this site</strong> — something answered but it is not this server, so DNS
+          is still pointing at the old host.</li>
+      <li><strong>Could not reach it</strong> — often just your host blocking outbound requests,
+          so it is not proof of a problem. Confirm in a browser before continuing.</li>
+    </ul>
+    <p>The Change Domain tab is also the right tool for moving a site from <code>http</code> to
+       <code>https</code>, or for renaming a domain later on.</p>
+  </section>
+
+  <section id="site-to-site">
+    <h2>Direct site-to-site transfer</h2>
+    <p>
+      Instead of downloading and re-uploading an archive, the source site can issue a one-time
+      token. The destination pulls the archive directly over the WordPress REST API and then runs
+      the same automatic conversion.
+    </p>
+    <ol class="steps">
+      <li><strong>On the old site</strong>
+          Open Site-to-Site and click <em>Build Backup &amp; Generate Token</em>. The export runs
+          to completion first, then a token valid for 24 hours is produced. Copy it.</li>
+      <li><strong>On the new site</strong>
+          Paste the token and click <em>Start Pull Transfer</em>.</li>
+    </ol>
+    <p>The old site's REST API must be reachable from the new server for this to work. If it is
+       not, use the Export and Import tabs instead — the result is identical.</p>
+  </section>
+
+  <section id="backups">
+    <h2>Managing backups</h2>
+    <p>
+      Archives are stored in <code>wp-content/uploads/owpm-backups/</code>. The Backups tab lists
+      them with their size and date, and lets you download or delete each one.
+    </p>
+    <p>
+      That folder carries deny-all rules for Apache and IIS plus index files, and archive names
+      include 32 random characters. More importantly, downloads are streamed through WordPress
+      only after a capability and nonce check — so the folder never has to be publicly readable,
+      which is what keeps backups private on Nginx, where <code>.htaccess</code> files are
+      ignored entirely.
+    </p>
+  </section>
+
+  <section id="troubleshooting">
+    <h2>Troubleshooting</h2>
+
+    <details>
+      <summary>The export or import seems to stop partway</summary>
+      <div class="inner">
+        <p>Keep the browser tab open and in the foreground. Work happens in short batches driven
+        by the page, so a backgrounded or closed tab pauses it. If it stops for good, check your
+        host's PHP error log and confirm free disk space in the server check.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>The site shows the old domain after importing</summary>
+      <div class="inner">
+        <p>That is expected if you imported onto a temporary address. Use the
+        <a href="#change-domain">Change Domain</a> tab once DNS points at the new server. If the
+        domain is already correct, clear your caching plugin and re-save Permalinks.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Images are missing after migrating</summary>
+      <div class="inner">
+        <p>Re-save Permalinks first, then clear any cache. If a specific image is still missing,
+        confirm it exists under <code>wp-content/uploads/</code> on the new server — files that
+        were unreadable at export time are skipped and reported in the export summary.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>I cannot log in after the import</summary>
+      <div class="inner">
+        <p>Use the <strong>original</strong> site's username and password. The archive replaced
+        the destination's user accounts. If you have lost them, reset the password from the
+        database or via WP-CLI.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>"The PHP ZipArchive extension is required"</summary>
+      <div class="inner">
+        <p>Ask your host to enable the PHP <code>zip</code> extension. It is required to create
+        and read archives, and most hosts enable it on request.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>The site-to-site pull fails</summary>
+      <div class="inner">
+        <p>The source site's REST API must be publicly reachable from the destination server, and
+        the token expires after 24 hours. Generate a fresh token, or fall back to Export and
+        Import, which produces the same result.</p>
+      </div>
+    </details>
+  </section>
+
+  <section id="security">
+    <h2>Security &amp; privacy</h2>
+    <ul>
+      <li>Every administrative action requires a valid nonce and the <code>manage_options</code>
+          capability.</li>
+      <li>Archive entries are validated one by one before extraction, so a crafted <code>.zip</code>
+          cannot write outside <code>wp-content</code>.</li>
+      <li>Backups are streamed through WordPress after a permission check rather than being
+          served as directly reachable files.</li>
+      <li>The address entered in Change Domain is fully validated — scheme, hostname and path —
+          instead of being silently corrected into something that merely looks valid.</li>
+      <li><strong>No tracking, no analytics, no phone-home.</strong> The only outbound requests
+          are to addresses you supply yourself when using site-to-site transfer or the DNS check.</li>
+      <li>Nothing is written outside <code>wp-content/uploads/owpm-backups/</code>, other than
+          the files an archive you chose to restore actually contains.</li>
+    </ul>
+  </section>
+
+  <section id="faq">
+    <h2>Frequently asked questions</h2>
+
+    <h3>Is there really no file size limit when importing?</h3>
+    <p>No limit. The archive is sliced into small pieces in the browser and reassembled on the
+       server, so <code>upload_max_filesize</code> and <code>post_max_size</code> never apply.
+       The chunk size is chosen automatically from your server's own limits.</p>
+
+    <h3>Do I need to run a search and replace after migrating?</h3>
+    <p>No. The conversion runs automatically as part of the import and reports how many database
+       rows it changed.</p>
+
+    <h3>Can I import a site that used a different table prefix?</h3>
+    <p>Yes. The prefix is recorded in the archive and converted during the restore, including the
+       prefixed keys stored inside the <code>options</code> and <code>usermeta</code> tables.</p>
+
+    <h3>Does it work with WooCommerce, Elementor and page builders?</h3>
+    <p>Yes. Page builders store absolute URLs and server paths inside serialised data, which is
+       exactly what the serialisation-safe replacement handles. Re-generate your builder's CSS
+       cache afterwards if it looks stale.</p>
+
+    <h3>Does this work on WordPress multisite?</h3>
+    <p>Not yet. Multisite networks are detected and refused rather than partially migrated, which
+       is safer than a half-completed network migration.</p>
+
+    <h3>Is it really free, with no paid upgrade?</h3>
+    <p>Yes — GPLv2, open source, no paid tier, no premium extensions, no feature gates and no
+       account. Unlimited file size is included rather than sold separately.</p>
+
+    <h3>Where are my backups stored?</h3>
+    <p>On your own server, in <code>wp-content/uploads/owpm-backups/</code>. They are never
+       uploaded anywhere else.</p>
+  </section>
+
+</main>
+
+  <aside class="side">
+    <nav class="toc" id="toc" aria-label="On this page">
+      <h2 id="toc-heading">On this page</h2>
+      <ol>
+        <li><a href="#what">What Open Migration does</a></li>
+        <li><a href="#alternative">A free alternative to paid migration plugins</a></li>
+        <li><a href="#requirements">Requirements</a></li>
+        <li><a href="#install">Installing the plugin</a></li>
+        <li><a href="#export">Exporting a site</a></li>
+        <li><a href="#import">Importing onto a new WordPress</a></li>
+        <li><a href="#after-import">What to do after an import</a></li>
+        <li><a href="#change-domain">Migrating before you switch DNS</a></li>
+        <li><a href="#site-to-site">Direct site-to-site transfer</a></li>
+        <li><a href="#backups">Managing backups</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+        <li><a href="#security">Security &amp; privacy</a></li>
+        <li><a href="#faq">Frequently asked questions</a></li>
+      </ol>
+    </nav>
+  </aside>
+</div>
+
+<footer>
+  <div class="wrap">
+    <p>
+      Open Migration is free and open source software released under the
+      <a href="https://www.gnu.org/licenses/gpl-2.0.html" rel="license">GPLv2 or later</a>,
+      built and maintained by <a href="https://dicecodes.com/">DiceCodes</a>.
+    </p>
+    <p>Documentation for version 1.3.4.</p>
+  </div>
+</footer>
+
+<script>
+/* Highlight the section currently in view. Progressive enhancement: the nav is
+   a plain list of anchors and works fully without this. */
+(function () {
+  var links = [].slice.call(document.querySelectorAll('#toc a'));
+  if (!links.length || !('IntersectionObserver' in window)) { return; }
+
+  var byId = {};
+  var sections = links.map(function (a) {
+    var el = document.querySelector(a.getAttribute('href'));
+    if (el) { byId[el.id] = a; }
+    return el;
+  }).filter(Boolean);
+
+  var visible = new Set();
+
+  function paint() {
+    var current = sections.filter(function (s) { return visible.has(s.id); })[0];
+    if (!current) { return; }
+    links.forEach(function (a) { a.classList.remove('active'); });
+    if (byId[current.id]) { byId[current.id].classList.add('active'); }
+  }
+
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { visible.add(e.target.id); } else { visible.delete(e.target.id); }
+    });
+    paint();
+  }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { observer.observe(s); });
+})();
+</script>
+</body>
+</html>
