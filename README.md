@@ -64,7 +64,7 @@ Your data never leaves your server. No cloud dependency, no tracking, no paid ti
   - [Migration & Export](#outbox_tray-migration--export)
   - [Import & Restoration](#inbox_tray-import--restoration)
   - [Backup Management](#briefcase-backup-management)
-- [Comparison: Open Migration vs Paid Alternatives](#-comparison-open-migration-vs-paid-alternatives)
+- [Comparison with other WordPress migration plugins](#-comparison-with-other-wordpress-migration-plugins)
 - [Quick Start / Installation](#quick-start--installation)
 - [Documentation & FAQ](#books-documentation--faq)
 - [Who Is This For?](#who-is-this-for)
@@ -123,22 +123,29 @@ Most WordPress migration plugins — All-in-One WP Migration, Duplicator, Updraf
 
 > **If you're paying to move your own data, you can stop now.**
 
-### 📊 Comparison: Open Migration vs Paid Alternatives
+### 📊 Comparison with other WordPress migration plugins
+
+All three alternatives are good plugins. This table is about **where the free tier ends**, because that is the difference that matters when your site outgrows it.
 
 | Feature | **Open Migration** | All-in-One WP Migration | Duplicator | UpdraftPlus |
 |---|---|---|---|---|
-| **Price** | ✅ **Free forever** | Freemium | Freemium | Freemium |
-| **Import Size Limit** | ✅ **Unlimited** | 512MB limit | Limited | Limited |
-| **Database Search & Replace** | ✅ Automatic | ✅ | ✅ | ⚠ Paid feature |
-| **Table Prefix Conversion** | ✅ Automatic | ✅ | ✅ | ⚠ Paid feature |
-| **Direct Site-to-Site Transfer** | ✅ Yes | ⚠ Paid Extension | ⚠ Paid Version | ⚠ Paid Version |
-| **Change Domain After DNS Switch** | ✅ Yes, with DNS safety check | ⚠ Manual | ⚠ Manual | ⚠ Manual |
-| **Cloud Storage (Drive/Dropbox)** | 🚀 Coming Soon | ⚠ Paid Extensions | ⚠ Paid Version | ⚠ Paid Version |
-| **Multisite Support** | 🚀 Coming Soon | ⚠ Paid Extension | ⚠ Paid Version | ⚠ Paid Version |
-| **Real-time Zipping Progress** | ✅ Yes | ✅ | ✅ | ⚠ Basic |
-| **Modern, Fast UI** | ✅ Yes | ⚠ Dated UI | ⚠ Dated UI | ⚠ Dated UI |
-| **Your data on YOUR server** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
-| **Open-source** | ✅ Yes | ❌ Proprietary | ❌ Proprietary | ❌ Proprietary |
+| **Licence** | ✅ GPLv2, fully open source | Freemium | Freemium | Freemium |
+| **Import size limit, free tier** | ✅ **No limit** | 512 MB<sup>[1]</sup> | No stated cap; Pro advised for large sites<sup>[2]</sup> | Bounded by host limits |
+| **Removing the size limit** | ✅ Included | Paid extension (~$69/yr)<sup>[1]</sup> | Pro | Paid |
+| **URL search & replace** | ✅ Automatic | ✅ Included | ✅ Included | ⚠ Migrator addon (paid) |
+| **Table prefix conversion** | ✅ Automatic | ✅ Included | ✅ Included | ⚠ Migrator addon (paid) |
+| **Serialisation-safe replacement** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
+| **Direct site-to-site transfer** | ✅ Included | ⚠ Paid extension | ⚠ Pro | ⚠ Paid |
+| **Change domain after a DNS switch, with a DNS pre-flight check** | ✅ Included | ➖ Manual | ➖ Manual | ➖ Manual |
+| **Scheduled automatic backups** | ➖ Not offered | ⚠ Paid | ⚠ Pro<sup>[2]</sup> | ✅ **Included free** |
+| **Cloud storage (Drive, Dropbox, S3)** | ➖ Not offered | ⚠ Paid extension | ⚠ Pro<sup>[2]</sup> | ✅ **Included free** |
+| **Multisite network migration** | ➖ Not supported | ⚠ Paid extension | ⚠ Pro<sup>[2]</sup> | ⚠ Paid |
+| **Account or sign-up required** | ✅ Never | ✅ No | ✅ No | ✅ No |
+| **Your data stays on your server** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
+
+**Where the others are the better choice:** if you want scheduled backups to Dropbox or Google Drive, UpdraftPlus does that for free and Open Migration does not do it at all. If you need multisite, none of the free tiers here will help you. Open Migration is built for one job — moving or restoring a single site of any size, without paying for it.
+
+<sub>[1] All-in-One WP Migration free import cap and Unlimited Extension pricing, per third-party reporting. [2] Duplicator Lite excludes scheduled backups, cloud storage and multisite; those are Pro features. Verified August 2026 — vendors change their tiers, so check before relying on it.</sub>
 
 ---
 
