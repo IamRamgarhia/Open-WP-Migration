@@ -6,9 +6,9 @@
 
 [![License: GPLv2](https://img.shields.io/badge/License-GPLv2-green.svg)](readme.txt)
 [![WordPress](https://img.shields.io/badge/WordPress-Ready-blue.svg?logo=wordpress)](#quick-start--installation)
-[![Version](https://img.shields.io/badge/Version-1.3.5-orange.svg)](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup/releases)
+[![Version](https://img.shields.io/badge/Version-1.3.5-orange.svg)](https://github.com/IamRamgarhia/open-migration/releases)
 [![PHP](https://img.shields.io/badge/PHP-7.2+-777BB4.svg?logo=php)](#quick-start--installation)
-[![GitHub Stars](https://img.shields.io/github/stars/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup?style=social)](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup)
+[![GitHub Stars](https://img.shields.io/github/stars/IamRamgarhia/open-migration?style=social)](https://github.com/IamRamgarhia/open-migration)
 [![Cost](https://img.shields.io/badge/Cost-100%25%20Free-brightgreen.svg)](#why-choose-open-migration)
 
 **Move a WordPress site to a new host, clone it to staging, or restore a full backup — with no upload size limit, no premium extension and no account.**
@@ -19,7 +19,7 @@ Your data never leaves your server. No cloud dependency, no tracking, no paid ti
 
 **Looking for:** a free All-in-One WP Migration alternative · a way to import a large WordPress backup without buying an extension · a Duplicator or UpdraftPlus alternative that does search-replace for free · a plugin to move WordPress from staging to live without breaking serialised data? That is what this is.
 
-[Documentation](https://dicecodes.com/open-migration/) &nbsp;|&nbsp; [Download Now](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup/releases/latest) &nbsp;|&nbsp; [Screenshots](#screenshots) &nbsp;|&nbsp; [5-Minute Quick Start](#your-first-backup-in-5-minutes) &nbsp;|&nbsp; [Report Bug](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup/issues) &nbsp;|&nbsp; [Request Feature](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup/issues)
+[Documentation](https://dicecodes.com/open-migration/) &nbsp;|&nbsp; [Download Now](https://github.com/IamRamgarhia/open-migration/releases/latest) &nbsp;|&nbsp; [Screenshots](#screenshots) &nbsp;|&nbsp; [5-Minute Quick Start](#your-first-backup-in-5-minutes) &nbsp;|&nbsp; [Report Bug](https://github.com/IamRamgarhia/open-migration/issues) &nbsp;|&nbsp; [Request Feature](https://github.com/IamRamgarhia/open-migration/issues)
 
 </div>
 
@@ -84,7 +84,7 @@ You need: A WordPress website running PHP 7.2 or higher with the ZipArchive exte
 
 ### Step 1 — Install (1 minute)
 
-1. Download the project as a ZIP from [this link](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup/archive/refs/heads/master.zip) or the Releases page.
+1. Download the project as a ZIP from [this link](https://github.com/IamRamgarhia/open-migration/archive/refs/heads/master.zip) or the Releases page.
 2. Go to your WordPress Admin Dashboard → **Plugins** → **Add New** → **Upload Plugin**.
 3. Choose the downloaded `open-migration.zip` file.
 4. Click **Install Now** and then **Activate**.
@@ -222,6 +222,6 @@ We strongly believe in community-driven development! If you want to help make Op
 
 ## Contact & Support
 
-If you found a bug or have a feature request, please [open an issue on GitHub](https://github.com/IamRamgarhia/Open-WP-Migration-Unlimited-Site-Transfer-Backup/issues). 
+If you found a bug or have a feature request, please [open an issue on GitHub](https://github.com/IamRamgarhia/open-migration/issues). 
 
 *Made with ❤️ for the WordPress Community.*
