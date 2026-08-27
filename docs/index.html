@@ -30,7 +30,9 @@
       "name": "Open Migration – Unlimited Site Transfer & Backup",
       "applicationCategory": "BrowserApplication",
       "operatingSystem": "WordPress 5.6 or newer, PHP 7.2 or newer",
-      "softwareVersion": "1.3.4",
+      "softwareVersion": "1.3.12",
+      "installUrl": "https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/",
+      "downloadUrl": "https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/",
       "description": "A free and open source WordPress migration and backup plugin. Exports a complete site to a single .zip and restores it onto any other WordPress install, converting site URLs, server paths and database table prefixes automatically. Chunked uploads remove the host's file size limit.",
       "url": "https://dicecodes.com/open-migration/",
       "author": { "@type": "Organization", "name": "DiceCodes", "url": "https://dicecodes.com/" },
@@ -113,6 +115,11 @@ header.hero h1{color:#fff}
 .badges{display:flex;flex-wrap:wrap;gap:8px}
 .badge{background:rgba(255,255,255,.15);border-radius:20px;padding:5px 13px;font-size:.8rem;font-weight:600}
 
+/* The directory link sits in the badge row; without this the generic anchor
+   rule paints it blue on a translucent pill in a dark header. */
+a.badge{color:inherit;transition:background .12s ease}
+a.badge:hover,a.badge:focus-visible{background:rgba(255,255,255,.3)}
+
 /* Two columns: content, then a sticky nav on the right. Main comes first in
    the source so reading order and crawling stay correct. */
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 232px;gap:48px;align-items:start;max-width:1080px}
@@ -193,7 +200,8 @@ footer a{font-weight:600}
       <span class="badge">GPLv2</span>
       <span class="badge">No file size cap</span>
       <span class="badge">No account required</span>
-      <span class="badge">v1.3.4</span>
+      <span class="badge">v1.3.12</span>
+      <a class="badge" href="https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/" rel="noopener">On WordPress.org</a>
     </div>
   </div>
 </header>
@@ -284,9 +292,12 @@ footer a{font-weight:600}
   <section id="install">
     <h2>Installing the plugin</h2>
     <ol class="steps">
-      <li><strong>Upload the plugin</strong>
-          In WordPress, go to Plugins → Add New → Upload Plugin and choose the
-          <code>.zip</code>.</li>
+      <li><strong>Install from WordPress.org</strong>
+          In WordPress, go to Plugins → Add New, search for
+          <strong>Open Migration</strong>, and click Install Now. This is the
+          recommended route because it gives you automatic updates. You can also
+          <a href="https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/" rel="noopener">download it from the plugin
+          directory</a> and use Plugins → Add New → Upload Plugin instead.</li>
       <li><strong>Activate it</strong>
           Open Migration appears in the admin sidebar.</li>
       <li><strong>Install it on both sites</strong>
@@ -423,7 +434,7 @@ footer a{font-weight:600}
   <section id="backups">
     <h2>Managing backups</h2>
     <p>
-      Archives are stored in <code>wp-content/uploads/owpm-backups/</code>. The Backups tab lists
+      Archives are stored in <code>wp-content/uploads/open-migration-unlimited-site-transfer-backup/</code>. The Backups tab lists
       them with their size and date, and lets you download or delete each one.
     </p>
     <p>
@@ -505,7 +516,7 @@ footer a{font-weight:600}
           instead of being silently corrected into something that merely looks valid.</li>
       <li><strong>No tracking, no analytics, no phone-home.</strong> The only outbound requests
           are to addresses you supply yourself when using site-to-site transfer or the DNS check.</li>
-      <li>Nothing is written outside <code>wp-content/uploads/owpm-backups/</code>, other than
+      <li>Nothing is written outside <code>wp-content/uploads/open-migration-unlimited-site-transfer-backup/</code>, other than
           the files an archive you chose to restore actually contains.</li>
     </ul>
   </section>
@@ -540,7 +551,7 @@ footer a{font-weight:600}
        account. Unlimited file size is included rather than sold separately.</p>
 
     <h3>Where are my backups stored?</h3>
-    <p>On your own server, in <code>wp-content/uploads/owpm-backups/</code>. They are never
+    <p>On your own server, in <code>wp-content/uploads/open-migration-unlimited-site-transfer-backup/</code>. They are never
        uploaded anywhere else.</p>
   </section>
 
@@ -575,7 +586,7 @@ footer a{font-weight:600}
       <a href="https://www.gnu.org/licenses/gpl-2.0.html" rel="license">GPLv2 or later</a>,
       built and maintained by <a href="https://dicecodes.com/">DiceCodes</a>.
     </p>
-    <p>Documentation for version 1.3.4.</p>
+    <p>Documentation for version 1.3.12.</p>
   </div>
 </footer>
 
