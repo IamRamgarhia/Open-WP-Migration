@@ -7,9 +7,9 @@
 [![WordPress.org](https://img.shields.io/wordpress/plugin/v/open-migration-unlimited-site-transfer-backup?logo=wordpress&label=WordPress.org)](https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/)
 [![License: GPLv2](https://img.shields.io/badge/License-GPLv2-green.svg)](readme.txt)
 [![WordPress](https://img.shields.io/badge/WordPress-Ready-blue.svg?logo=wordpress)](#quick-start--installation)
-[![Version](https://img.shields.io/badge/Version-1.3.12-orange.svg)](https://github.com/IamRamgarhia/open-migration/releases)
+[![Version](https://img.shields.io/badge/Version-1.3.12-orange.svg)](https://github.com/IamRamgarhia/Open-WP-Migration/releases)
 [![PHP](https://img.shields.io/badge/PHP-7.2+-777BB4.svg?logo=php)](#quick-start--installation)
-[![GitHub Stars](https://img.shields.io/github/stars/IamRamgarhia/open-migration?style=social)](https://github.com/IamRamgarhia/open-migration)
+[![GitHub Stars](https://img.shields.io/github/stars/IamRamgarhia/Open-WP-Migration?style=social)](https://github.com/IamRamgarhia/Open-WP-Migration)
 [![Cost](https://img.shields.io/badge/Cost-100%25%20Free-brightgreen.svg)](#why-choose-open-migration)
 
 **Move a WordPress site to a new host, clone it to staging, or restore a full backup — with no upload size limit, no premium extension and no account.**
@@ -20,7 +20,7 @@ Your data never leaves your server. No cloud dependency, no tracking, no paid ti
 
 **Looking for:** a free All-in-One WP Migration alternative · a way to import a large WordPress backup without buying an extension · a Duplicator or UpdraftPlus alternative that does search-replace for free · a plugin to move WordPress from staging to live without breaking serialised data? That is what this is.
 
-[Install from WordPress.org](https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/) &nbsp;|&nbsp; [Documentation](https://dicecodes.com/open-migration/) &nbsp;|&nbsp; [Download Now](https://github.com/IamRamgarhia/open-migration/releases/latest) &nbsp;|&nbsp; [Screenshots](#screenshots) &nbsp;|&nbsp; [5-Minute Quick Start](#your-first-backup-in-5-minutes) &nbsp;|&nbsp; [Report Bug](https://github.com/IamRamgarhia/open-migration/issues) &nbsp;|&nbsp; [Request Feature](https://github.com/IamRamgarhia/open-migration/issues)
+[Install from WordPress.org](https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/) &nbsp;|&nbsp; [Documentation](https://dicecodes.com/open-migration/) &nbsp;|&nbsp; [Download Now](https://github.com/IamRamgarhia/Open-WP-Migration/releases/latest) &nbsp;|&nbsp; [Screenshots](#screenshots) &nbsp;|&nbsp; [5-Minute Quick Start](#your-first-backup-in-5-minutes) &nbsp;|&nbsp; [Report Bug](https://github.com/IamRamgarhia/Open-WP-Migration/issues) &nbsp;|&nbsp; [Request Feature](https://github.com/IamRamgarhia/Open-WP-Migration/issues)
 
 </div>
 
@@ -95,7 +95,7 @@ You will get automatic updates this way.
 
 **Or install manually:**
 
-1. Download the latest release from [WordPress.org](https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/) or the [Releases page](https://github.com/IamRamgarhia/open-migration/releases/latest).
+1. Download the latest release from [WordPress.org](https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/) or the [Releases page](https://github.com/IamRamgarhia/Open-WP-Migration/releases/latest).
 2. Go to **Plugins → Add New → Upload Plugin** and choose the `.zip`.
 3. Click **Install Now**, then **Activate**.
 
@@ -234,7 +234,7 @@ We strongly believe in community-driven development! If you want to help make Op
 
 ## Contact & Support
 
-If you found a bug or have a feature request, please [open an issue on GitHub](https://github.com/IamRamgarhia/open-migration/issues), or ask on the [WordPress.org support forum](https://wordpress.org/support/plugin/open-migration-unlimited-site-transfer-backup/).
+If you found a bug or have a feature request, please [open an issue on GitHub](https://github.com/IamRamgarhia/Open-WP-Migration/issues), or ask on the [WordPress.org support forum](https://wordpress.org/support/plugin/open-migration-unlimited-site-transfer-backup/).
 
 If the plugin saved you a migration, a [review on WordPress.org](https://wordpress.org/support/plugin/open-migration-unlimited-site-transfer-backup/reviews/) genuinely helps other people find it.
 
