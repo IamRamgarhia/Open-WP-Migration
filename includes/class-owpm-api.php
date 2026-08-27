@@ -15,6 +15,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class OWPM_API {
 
+	/** Identifies the token format, so a future version can change it safely. */
+	const TOKEN_PREFIX = 'owpm1';
+
+	/** Not present in a URL-encoded value, a backup id, or a generated secret. */
+	const TOKEN_SEPARATOR = '~';
+
 	public function __construct() {
 		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
 		add_action( 'wp_ajax_owpm_generate_token', array( $this, 'ajax_generate_token' ) );
@@ -52,7 +58,7 @@ class OWPM_API {
 		check_ajax_referer( 'owpm_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration' ), 403 );
+			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
 		}
 
 		// sanitize_id() is stricter than sanitize_text_field(): it strips everything
@@ -61,7 +67,7 @@ class OWPM_API {
 		$backup_id = isset( $_POST['backup_id'] ) ? OWPM_FS::sanitize_id( wp_unslash( $_POST['backup_id'] ) ) : '';
 
 		if ( '' === $backup_id ) {
-			wp_send_json_error( __( 'No backup was specified.', 'open-migration' ) );
+			wp_send_json_error( __( 'No backup was specified.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		$dir  = OWPM_FS::backup_dir();
@@ -70,7 +76,7 @@ class OWPM_API {
 		// Never hand out a token for an archive that does not exist yet: the
 		// destination would race the export and pull a truncated file.
 		if ( ! file_exists( $path ) || ! OWPM_FS::is_inside( $path, $dir ) ) {
-			wp_send_json_error( __( 'That backup could not be found. Finish the export before generating a token.', 'open-migration' ) );
+			wp_send_json_error( __( 'That backup could not be found. Finish the export before generating a token.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		// Advisory only. This is a loopback request, and plenty of hosts block a
@@ -78,20 +84,24 @@ class OWPM_API {
 		// outside, so a failure here must not prevent the transfer.
 		$warning = $this->rest_is_reachable()
 			? ''
-			: __( 'This server could not reach its own REST API. That is often harmless, but if the pull fails on the destination, use the Export and Import tabs instead.', 'open-migration' );
+			: __( 'This server could not reach its own REST API. That is often harmless, but if the pull fails on the destination, use the Export and Import tabs instead.', 'open-migration-unlimited-site-transfer-backup' );
 
 		$secret = wp_generate_password( 48, false );
 		set_transient( 'owpm_secret_' . $backup_id, $secret, DAY_IN_SECONDS );
 
-		$token = base64_encode( // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
-			wp_json_encode(
-				array(
-					'url'       => untrailingslashit( site_url() ),
-					'backup_id' => $backup_id,
-					'secret'    => $secret,
-					'size'      => (int) filesize( $path ),
-					'issued'    => time(),
-				)
+		// A plain, delimited, human-readable token. Deliberately not base64: the
+		// directory guidelines discourage anything that resembles obfuscation, and
+		// a reviewer or user should be able to read exactly what they are pasting
+		// between two sites. Only the URL is encoded, because it contains '/'.
+		$token = implode(
+			self::TOKEN_SEPARATOR,
+			array(
+				self::TOKEN_PREFIX,
+				rawurlencode( untrailingslashit( site_url() ) ),
+				$backup_id,
+				$secret,
+				(int) filesize( $path ),
+				time(),
 			)
 		);
 
@@ -102,6 +112,36 @@ class OWPM_API {
 				'expires' => DAY_IN_SECONDS,
 				'warning' => $warning,
 			)
+		);
+	}
+
+	/**
+	 * Read a migration token back into its parts.
+	 *
+	 * Everything here arrives from whoever pasted the token, so each field is
+	 * validated by its caller before use.
+	 *
+	 * @return array|false
+	 */
+	private function parse_token( $token ) {
+		$parts = explode( self::TOKEN_SEPARATOR, trim( (string) $token ) );
+
+		if ( count( $parts ) < 4 || self::TOKEN_PREFIX !== $parts[0] ) {
+			return false;
+		}
+
+		$url = rawurldecode( $parts[1] );
+
+		if ( '' === $url || '' === $parts[2] || '' === $parts[3] ) {
+			return false;
+		}
+
+		return array(
+			'url'       => $url,
+			'backup_id' => $parts[2],
+			'secret'    => $parts[3],
+			'size'      => isset( $parts[4] ) ? (int) $parts[4] : 0,
+			'issued'    => isset( $parts[5] ) ? (int) $parts[5] : 0,
 		);
 	}
 
@@ -136,18 +176,18 @@ class OWPM_API {
 
 		// hash_equals() throws on a non-string in PHP 8, so check both sides first.
 		if ( '' === $backup_id || '' === $secret || ! is_string( $stored ) || '' === $stored ) {
-			return new WP_Error( 'owpm_unauthorized', __( 'Invalid or expired migration token.', 'open-migration' ), array( 'status' => 401 ) );
+			return new WP_Error( 'owpm_unauthorized', __( 'Invalid or expired migration token.', 'open-migration-unlimited-site-transfer-backup' ), array( 'status' => 401 ) );
 		}
 
 		if ( ! hash_equals( $stored, $secret ) ) {
-			return new WP_Error( 'owpm_unauthorized', __( 'Invalid or expired migration token.', 'open-migration' ), array( 'status' => 401 ) );
+			return new WP_Error( 'owpm_unauthorized', __( 'Invalid or expired migration token.', 'open-migration-unlimited-site-transfer-backup' ), array( 'status' => 401 ) );
 		}
 
 		$dir       = OWPM_FS::backup_dir();
 		$file_path = $dir . $backup_id . '.zip';
 
 		if ( ! file_exists( $file_path ) || ! OWPM_FS::is_inside( $file_path, $dir ) ) {
-			return new WP_Error( 'owpm_not_found', __( 'Backup file not found.', 'open-migration' ), array( 'status' => 404 ) );
+			return new WP_Error( 'owpm_not_found', __( 'Backup file not found.', 'open-migration-unlimited-site-transfer-backup' ), array( 'status' => 404 ) );
 		}
 
 		OWPM_FS::raise_limits();
@@ -163,10 +203,10 @@ class OWPM_API {
 			ob_end_clean();
 		}
 
-		$handle = @fopen( $file_path, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+		$handle = @fopen( $file_path, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen, WordPress.PHP.NoSilencedErrors.Discouraged
 
 		if ( ! $handle ) {
-			return new WP_Error( 'owpm_unreadable', __( 'Backup file could not be read.', 'open-migration' ), array( 'status' => 500 ) );
+			return new WP_Error( 'owpm_unreadable', __( 'Backup file could not be read.', 'open-migration-unlimited-site-transfer-backup' ), array( 'status' => 500 ) );
 		}
 
 		while ( ! feof( $handle ) ) {
@@ -189,7 +229,7 @@ class OWPM_API {
 		check_ajax_referer( 'owpm_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration' ), 403 );
+			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
 		}
 
 		OWPM_FS::raise_limits();
@@ -197,14 +237,13 @@ class OWPM_API {
 		$token = isset( $_POST['token'] ) ? trim( wp_unslash( $_POST['token'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
 		if ( '' === $token ) {
-			wp_send_json_error( __( 'Please paste a migration token.', 'open-migration' ) );
+			wp_send_json_error( __( 'Please paste a migration token.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
-		// Tokens are base64 of JSON; anything else is a paste error.
-		$decoded = json_decode( base64_decode( $token ), true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+		$decoded = $this->parse_token( $token );
 
-		if ( ! is_array( $decoded ) || empty( $decoded['url'] ) || empty( $decoded['backup_id'] ) || empty( $decoded['secret'] ) ) {
-			wp_send_json_error( __( 'That token is not valid. Copy the whole token from the source site and try again.', 'open-migration' ) );
+		if ( ! $decoded ) {
+			wp_send_json_error( __( 'That token is not valid. Copy the whole token from the source site and try again.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		// Everything in the token is attacker-controllable, so validate all of it.
@@ -213,15 +252,15 @@ class OWPM_API {
 		$secret     = sanitize_text_field( (string) $decoded['secret'] );
 
 		if ( '' === $backup_id || '' === $secret ) {
-			wp_send_json_error( __( 'That token is not valid.', 'open-migration' ) );
+			wp_send_json_error( __( 'That token is not valid.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		if ( ! $source_url || ! wp_http_validate_url( $source_url ) ) {
-			wp_send_json_error( __( 'The source site address in that token is not a valid URL.', 'open-migration' ) );
+			wp_send_json_error( __( 'The source site address in that token is not a valid URL.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		if ( untrailingslashit( $source_url ) === untrailingslashit( site_url() ) ) {
-			wp_send_json_error( __( 'That token was generated on this same site. Use it on the destination site instead.', 'open-migration' ) );
+			wp_send_json_error( __( 'That token was generated on this same site. Use it on the destination site instead.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		$dir = OWPM_FS::init_backup_dir();
@@ -230,7 +269,7 @@ class OWPM_API {
 		$local_file = $dir . $backup_id . '.zip';
 
 		if ( ! OWPM_FS::is_inside( $local_file, $dir ) ) {
-			wp_send_json_error( __( 'Invalid download target.', 'open-migration' ) );
+			wp_send_json_error( __( 'Invalid download target.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		OWPM_FS::delete( $local_file );
@@ -252,7 +291,7 @@ class OWPM_API {
 
 		if ( is_wp_error( $response ) ) {
 			OWPM_FS::delete( $local_file );
-			wp_send_json_error( sprintf( /* translators: %s: error message. */ __( 'Could not reach the source site: %s', 'open-migration' ), $response->get_error_message() ) );
+			wp_send_json_error( sprintf( /* translators: %s: error message. */ __( 'Could not reach the source site: %s', 'open-migration-unlimited-site-transfer-backup' ), $response->get_error_message() ) );
 		}
 
 		$status = (int) wp_remote_retrieve_response_code( $response );
@@ -261,31 +300,31 @@ class OWPM_API {
 			OWPM_FS::delete( $local_file );
 
 			if ( 401 === $status ) {
-				wp_send_json_error( __( 'The source site rejected the token. It may have expired — generate a fresh one.', 'open-migration' ) );
+				wp_send_json_error( __( 'The source site rejected the token. It may have expired — generate a fresh one.', 'open-migration-unlimited-site-transfer-backup' ) );
 			}
 			if ( 404 === $status ) {
-				wp_send_json_error( __( 'The source site no longer has that backup. Run the export again on the source site.', 'open-migration' ) );
+				wp_send_json_error( __( 'The source site no longer has that backup. Run the export again on the source site.', 'open-migration-unlimited-site-transfer-backup' ) );
 			}
 
-			wp_send_json_error( sprintf( /* translators: %d: HTTP status code. */ __( 'The source site responded with HTTP %d.', 'open-migration' ), $status ) );
+			wp_send_json_error( sprintf( /* translators: %d: HTTP status code. */ __( 'The source site responded with HTTP %d.', 'open-migration-unlimited-site-transfer-backup' ), $status ) );
 		}
 
 		if ( ! file_exists( $local_file ) || filesize( $local_file ) < 100 ) {
 			OWPM_FS::delete( $local_file );
-			wp_send_json_error( __( 'The downloaded backup was empty. Check that the source site can serve large files.', 'open-migration' ) );
+			wp_send_json_error( __( 'The downloaded backup was empty. Check that the source site can serve large files.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		// Confirm we received an archive and not an HTML error page.
-		$handle = @fopen( $local_file, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+		$handle = @fopen( $local_file, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen, WordPress.PHP.NoSilencedErrors.Discouraged
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread
-		$magic  = $handle ? fread( $handle, 4 ) : '';
+		$magic = $handle ? fread( $handle, 4 ) : '';
 		if ( $handle ) {
 			fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 		}
 
 		if ( "PK\x03\x04" !== $magic && "PK\x05\x06" !== $magic ) {
 			OWPM_FS::delete( $local_file );
-			wp_send_json_error( __( 'The source site returned something that is not a backup archive. Check that its REST API is publicly reachable.', 'open-migration' ) );
+			wp_send_json_error( __( 'The source site returned something that is not a backup archive. Check that its REST API is publicly reachable.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		$expected = isset( $decoded['size'] ) ? (int) $decoded['size'] : 0;
@@ -293,7 +332,7 @@ class OWPM_API {
 
 		if ( $expected > 0 && $actual !== $expected ) {
 			OWPM_FS::delete( $local_file );
-			wp_send_json_error( __( 'The download was incomplete. Please try the transfer again.', 'open-migration' ) );
+			wp_send_json_error( __( 'The download was incomplete. Please try the transfer again.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		wp_send_json_success(

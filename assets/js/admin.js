@@ -485,6 +485,16 @@
                 return runUntilComplete('owpm_import_db', payload, function (data) {
                     view.set(at(0.52 + (data.progress || 0) / 100 * 0.28),
                         'Restoring database… ' + (data.progress || 0) + '%');
+                }).then(function (data) {
+                    // Restoring the database replaced the users table, so the old
+                    // login cookie stopped validating. The server signs us back in
+                    // and returns a nonce bound to the new session; adopting it
+                    // lets the remaining steps use the normal authenticated path
+                    // instead of falling back to the one-time key.
+                    if (data && data.nonce) {
+                        owpm_ajax.nonce = data.nonce;
+                    }
+                    return data;
                 });
             }).then(function () {
                 view.set(at(0.82), 'Converting URLs and paths…');

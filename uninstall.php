@@ -11,7 +11,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 
 // Remove the working directory and every backup inside it.
 $owpm_upload_dir = wp_upload_dir();
-$owpm_backup_dir = trailingslashit( $owpm_upload_dir['basedir'] ) . 'owpm-backups/';
+$owpm_backup_dir = trailingslashit( $owpm_upload_dir['basedir'] ) . 'open-migration-unlimited-site-transfer-backup/';
 
 if ( is_dir( $owpm_backup_dir ) ) {
 	$owpm_delete = function ( $path ) use ( &$owpm_delete ) {

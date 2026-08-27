@@ -53,45 +53,48 @@ class OWPM_Admin {
 		check_ajax_referer( 'owpm_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration' ), 403 );
+			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
 		}
 
 		global $wpdb;
 
+		// Both resolved through wp_upload_dir(); assembling an uploads path from
+		// Assembling an uploads path by hand is wrong on installs that relocate it.
 		$backup_dir = OWPM_FS::backup_dir();
-		$probe_dir  = is_dir( $backup_dir ) ? $backup_dir : WP_CONTENT_DIR . '/uploads';
+		$uploads    = OWPM_FS::uploads_dir();
+		$probe_dir  = is_dir( $backup_dir ) ? $backup_dir : $uploads;
 
-		$free_space = @disk_free_space( WP_CONTENT_DIR ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		$free_space = $probe_dir ? @disk_free_space( $probe_dir ) : false; // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 		$db_size    = $this->database_size();
 
 		$checks = array();
 
 		$checks[] = array(
-			'label'  => __( 'ZipArchive extension', 'open-migration' ),
-			'value'  => class_exists( 'ZipArchive' ) ? __( 'Available', 'open-migration' ) : __( 'Missing', 'open-migration' ),
-			'state'  => class_exists( 'ZipArchive' ) ? 'ok' : 'error',
-			'hint'   => class_exists( 'ZipArchive' ) ? '' : __( 'Required to create and read backups. Ask your host to enable the PHP zip extension.', 'open-migration' ),
+			'label' => __( 'ZipArchive extension', 'open-migration-unlimited-site-transfer-backup' ),
+			'value' => class_exists( 'ZipArchive' ) ? __( 'Available', 'open-migration-unlimited-site-transfer-backup' ) : __( 'Missing', 'open-migration-unlimited-site-transfer-backup' ),
+			'state' => class_exists( 'ZipArchive' ) ? 'ok' : 'error',
+			'hint'  => class_exists( 'ZipArchive' ) ? '' : __( 'Required to create and read backups. Ask your host to enable the PHP zip extension.', 'open-migration-unlimited-site-transfer-backup' ),
 		);
 
 		$checks[] = array(
-			'label' => __( 'PHP version', 'open-migration' ),
+			'label' => __( 'PHP version', 'open-migration-unlimited-site-transfer-backup' ),
 			'value' => PHP_VERSION,
 			'state' => version_compare( PHP_VERSION, '7.2', '>=' ) ? 'ok' : 'error',
-			'hint'  => version_compare( PHP_VERSION, '7.2', '>=' ) ? '' : __( 'PHP 7.2 or newer is required.', 'open-migration' ),
+			'hint'  => version_compare( PHP_VERSION, '7.2', '>=' ) ? '' : __( 'PHP 7.2 or newer is required.', 'open-migration-unlimited-site-transfer-backup' ),
 		);
 
 		$writable = is_dir( $probe_dir ) ? wp_is_writable( $probe_dir ) : wp_is_writable( dirname( $probe_dir ) );
 
 		$checks[] = array(
-			'label' => __( 'Backup folder writable', 'open-migration' ),
-			'value' => $writable ? __( 'Yes', 'open-migration' ) : __( 'No', 'open-migration' ),
+			'label' => __( 'Backup folder writable', 'open-migration-unlimited-site-transfer-backup' ),
+			'value' => $writable ? __( 'Yes', 'open-migration-unlimited-site-transfer-backup' ) : __( 'No', 'open-migration-unlimited-site-transfer-backup' ),
 			'state' => $writable ? 'ok' : 'error',
-			'hint'  => $writable ? '' : __( 'wp-content/uploads is not writable, so backups cannot be created.', 'open-migration' ),
+			'hint'  => $writable ? '' : __( 'wp-content/uploads is not writable, so backups cannot be created.', 'open-migration-unlimited-site-transfer-backup' ),
 		);
 
 		$checks[] = array(
-			'label' => __( 'Database size', 'open-migration' ),
-			'value' => $db_size > 0 ? size_format( $db_size ) : __( 'Unknown', 'open-migration' ),
+			'label' => __( 'Database size', 'open-migration-unlimited-site-transfer-backup' ),
+			'value' => $db_size > 0 ? size_format( $db_size ) : __( 'Unknown', 'open-migration-unlimited-site-transfer-backup' ),
 			'state' => 'info',
 			'hint'  => '',
 		);
@@ -102,43 +105,43 @@ class OWPM_Admin {
 
 		if ( $free_space && $db_size > 0 && $free_space < ( $db_size * 3 ) ) {
 			$space_state = 'warn';
-			$space_hint  = __( 'Free space is low relative to your database. Delete old backups before exporting.', 'open-migration' );
+			$space_hint  = __( 'Free space is low relative to your database. Delete old backups before exporting.', 'open-migration-unlimited-site-transfer-backup' );
 		} elseif ( ! $free_space ) {
 			$space_state = 'info';
 		}
 
 		$checks[] = array(
-			'label' => __( 'Free disk space', 'open-migration' ),
-			'value' => $free_space ? size_format( $free_space ) : __( 'Unknown', 'open-migration' ),
+			'label' => __( 'Free disk space', 'open-migration-unlimited-site-transfer-backup' ),
+			'value' => $free_space ? size_format( $free_space ) : __( 'Unknown', 'open-migration-unlimited-site-transfer-backup' ),
 			'state' => $space_state,
 			'hint'  => $space_hint,
 		);
 
 		$checks[] = array(
-			'label' => __( 'Upload limit bypass', 'open-migration' ),
+			'label' => __( 'Upload limit bypass', 'open-migration-unlimited-site-transfer-backup' ),
 			/* translators: %s: chunk size, e.g. 2 MB. */
-			'value' => sprintf( __( 'Active (%s chunks)', 'open-migration' ), size_format( $this->chunk_size() ) ),
+			'value' => sprintf( __( 'Active (%s chunks)', 'open-migration-unlimited-site-transfer-backup' ), size_format( $this->chunk_size() ) ),
 			'state' => 'ok',
 			'hint'  => sprintf(
 				/* translators: %s: the server's upload_max_filesize value. */
-				__( 'Your server limit is %s, but chunking means archive size does not matter.', 'open-migration' ),
+				__( 'Your server limit is %s, but chunking means archive size does not matter.', 'open-migration-unlimited-site-transfer-backup' ),
 				size_format( wp_convert_hr_to_bytes( ini_get( 'upload_max_filesize' ) ) )
 			),
 		);
 
 		if ( is_multisite() ) {
 			$checks[] = array(
-				'label' => __( 'Multisite', 'open-migration' ),
-				'value' => __( 'Not supported', 'open-migration' ),
+				'label' => __( 'Multisite', 'open-migration-unlimited-site-transfer-backup' ),
+				'value' => __( 'Not supported', 'open-migration-unlimited-site-transfer-backup' ),
 				'state' => 'error',
-				'hint'  => __( 'This plugin supports single-site installs only.', 'open-migration' ),
+				'hint'  => __( 'This plugin supports single-site installs only.', 'open-migration-unlimited-site-transfer-backup' ),
 			);
 		}
 
 		$blocking = 0;
 		foreach ( $checks as $check ) {
 			if ( 'error' === $check['state'] ) {
-				$blocking++;
+				++$blocking;
 			}
 		}
 
@@ -176,8 +179,8 @@ class OWPM_Admin {
 
 	public function add_admin_menu() {
 		add_menu_page(
-			__( 'Open Migration', 'open-migration' ),
-			__( 'Open Migration', 'open-migration' ),
+			__( 'Open Migration', 'open-migration-unlimited-site-transfer-backup' ),
+			__( 'Open Migration', 'open-migration-unlimited-site-transfer-backup' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_admin_page' ),
@@ -190,7 +193,7 @@ class OWPM_Admin {
 		$link = sprintf(
 			'<a href="%s">%s</a>',
 			esc_url( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) ),
-			esc_html__( 'Migrate', 'open-migration' )
+			esc_html__( 'Migrate', 'open-migration-unlimited-site-transfer-backup' )
 		);
 
 		array_unshift( $links, $link );
@@ -212,7 +215,7 @@ class OWPM_Admin {
 		$links[] = sprintf(
 			'<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
 			esc_url( self::DOCS_URL ),
-			esc_html__( 'Documentation & support', 'open-migration' )
+			esc_html__( 'Documentation & support', 'open-migration-unlimited-site-transfer-backup' )
 		);
 
 		return $links;
@@ -269,56 +272,56 @@ class OWPM_Admin {
 	 */
 	private function strings() {
 		return array(
-			'confirmImport'   => __( "This will OVERWRITE this site's database and files with the contents of the backup.\n\nThis cannot be undone. Continue?", 'open-migration' ),
-			'confirmDelete'   => __( 'This permanently removes the archive from this server. Any copy you have already downloaded is unaffected.', 'open-migration' ),
-			'noZipSupport'    => __( 'The PHP ZipArchive extension is not enabled on this server, so exports and imports cannot run. Please ask your host to enable it.', 'open-migration' ),
-			'multisite'       => __( 'Multisite networks are not supported yet.', 'open-migration' ),
-			'notZip'          => __( 'Please choose a .zip backup file.', 'open-migration' ),
-			'noToken'         => __( 'Please paste a migration token.', 'open-migration' ),
-			'noDomain'        => __( 'Please enter the new site address.', 'open-migration' ),
-			'continueAnyway'  => __( 'Continue with the import anyway?', 'open-migration' ),
-			'importCancelled' => __( 'Import cancelled.', 'open-migration' ),
-			'serverError'     => __( 'Server error', 'open-migration' ),
-			'unknownError'    => __( 'Unknown error', 'open-migration' ),
-			'networkError'    => __( 'The connection to the server failed. Check your internet connection and try again.', 'open-migration' ),
-			'loadingBackups'  => __( 'Loading backups…', 'open-migration' ),
-			'noBackups'       => __( 'No backups found on this server.', 'open-migration' ),
-			'backupsFailed'   => __( 'Failed to load backups.', 'open-migration' ),
-			'deleting'        => __( 'Deleting…', 'open-migration' ),
-			'download'        => __( 'Download', 'open-migration' ),
-			'delete'          => __( 'Delete', 'open-migration' ),
-			'colName'         => __( 'Backup Name', 'open-migration' ),
-			'colDate'         => __( 'Date', 'open-migration' ),
-			'colSize'         => __( 'Size', 'open-migration' ),
-			'colActions'      => __( 'Actions', 'open-migration' ),
-			'copy'            => __( 'Copy Token', 'open-migration' ),
-			'copied'          => __( 'Copied!', 'open-migration' ),
-			'tokenTitle'      => __( 'Your Migration Token', 'open-migration' ),
-			'tokenNote'       => __( 'Valid for 24 hours. Paste this into the destination site and click Start Pull Transfer.', 'open-migration' ),
-			'reloginNeeded'   => __( 'You are now signed out because the imported database replaced this site\'s user accounts. Log in with the username and password from the ORIGINAL site.', 'open-migration' ),
-			'reloginDone'     => __( 'You are still signed in. Please review your Permalinks settings and re-save them.', 'open-migration' ),
-			'importDone'      => __( 'Import complete.', 'open-migration' ),
-			'modalTitle'       => __( 'Please confirm', 'open-migration' ),
-			'modalNotice'      => __( 'Open Migration', 'open-migration' ),
-			'modalOk'          => __( 'OK', 'open-migration' ),
-			'modalCancel'      => __( 'Cancel', 'open-migration' ),
-			'modalContinue'    => __( 'Continue', 'open-migration' ),
-			'confirmImportTitle' => __( 'Overwrite this site?', 'open-migration' ),
-			'confirmImportBtn'   => __( 'Overwrite this site', 'open-migration' ),
-			'confirmDomainTitle' => __( 'Change the site address?', 'open-migration' ),
-			'confirmDomainBtn'   => __( 'Change domain', 'open-migration' ),
-			'confirmDeleteTitle' => __( 'Delete this backup?', 'open-migration' ),
-			'confirmDeleteBtn'   => __( 'Delete backup', 'open-migration' ),
-			'compatTitle'        => __( 'Check before continuing', 'open-migration' ),
-			'confirmDomain'   => __( 'This rewrites every reference across the whole database and cannot be undone. Continue?', 'open-migration' ),
-			'confirmDomainFrom' => __( 'Change this site’s address?', 'open-migration' ),
-			'dnsChecking'     => __( 'Checking whether that address reaches this server…', 'open-migration' ),
-			'dnsWarnMismatch' => __( 'WARNING: the DNS check said that address does NOT point to this server. Continuing will take this site offline.', 'open-migration' ),
-			'dnsWarnUnchecked' => __( 'You have not confirmed that this address points to this server. Use "Check DNS" first if you are unsure.', 'open-migration' ),
-			'domainDone'      => __( 'Domain changed.', 'open-migration' ),
-			'domainRelogin'   => __( 'You are now signed out of this address. Open the new one and log in again, then re-save Settings → Permalinks.', 'open-migration' ),
-			'domainGoTo'      => __( 'Go to the new address', 'open-migration' ),
-			'rowsUpdated'     => __( 'database rows updated', 'open-migration' ),
+			'confirmImport'      => __( "This will OVERWRITE this site's database and files with the contents of the backup.\n\nThis cannot be undone. Continue?", 'open-migration-unlimited-site-transfer-backup' ),
+			'confirmDelete'      => __( 'This permanently removes the archive from this server. Any copy you have already downloaded is unaffected.', 'open-migration-unlimited-site-transfer-backup' ),
+			'noZipSupport'       => __( 'The PHP ZipArchive extension is not enabled on this server, so exports and imports cannot run. Please ask your host to enable it.', 'open-migration-unlimited-site-transfer-backup' ),
+			'multisite'          => __( 'Multisite networks are not supported yet.', 'open-migration-unlimited-site-transfer-backup' ),
+			'notZip'             => __( 'Please choose a .zip backup file.', 'open-migration-unlimited-site-transfer-backup' ),
+			'noToken'            => __( 'Please paste a migration token.', 'open-migration-unlimited-site-transfer-backup' ),
+			'noDomain'           => __( 'Please enter the new site address.', 'open-migration-unlimited-site-transfer-backup' ),
+			'continueAnyway'     => __( 'Continue with the import anyway?', 'open-migration-unlimited-site-transfer-backup' ),
+			'importCancelled'    => __( 'Import cancelled.', 'open-migration-unlimited-site-transfer-backup' ),
+			'serverError'        => __( 'Server error', 'open-migration-unlimited-site-transfer-backup' ),
+			'unknownError'       => __( 'Unknown error', 'open-migration-unlimited-site-transfer-backup' ),
+			'networkError'       => __( 'The connection to the server failed. Check your internet connection and try again.', 'open-migration-unlimited-site-transfer-backup' ),
+			'loadingBackups'     => __( 'Loading backups…', 'open-migration-unlimited-site-transfer-backup' ),
+			'noBackups'          => __( 'No backups found on this server.', 'open-migration-unlimited-site-transfer-backup' ),
+			'backupsFailed'      => __( 'Failed to load backups.', 'open-migration-unlimited-site-transfer-backup' ),
+			'deleting'           => __( 'Deleting…', 'open-migration-unlimited-site-transfer-backup' ),
+			'download'           => __( 'Download', 'open-migration-unlimited-site-transfer-backup' ),
+			'delete'             => __( 'Delete', 'open-migration-unlimited-site-transfer-backup' ),
+			'colName'            => __( 'Backup Name', 'open-migration-unlimited-site-transfer-backup' ),
+			'colDate'            => __( 'Date', 'open-migration-unlimited-site-transfer-backup' ),
+			'colSize'            => __( 'Size', 'open-migration-unlimited-site-transfer-backup' ),
+			'colActions'         => __( 'Actions', 'open-migration-unlimited-site-transfer-backup' ),
+			'copy'               => __( 'Copy Token', 'open-migration-unlimited-site-transfer-backup' ),
+			'copied'             => __( 'Copied!', 'open-migration-unlimited-site-transfer-backup' ),
+			'tokenTitle'         => __( 'Your Migration Token', 'open-migration-unlimited-site-transfer-backup' ),
+			'tokenNote'          => __( 'Valid for 24 hours. Paste this into the destination site and click Start Pull Transfer.', 'open-migration-unlimited-site-transfer-backup' ),
+			'reloginNeeded'      => __( 'You are now signed out because the imported database replaced this site\'s user accounts. Log in with the username and password from the ORIGINAL site.', 'open-migration-unlimited-site-transfer-backup' ),
+			'reloginDone'        => __( 'You are still signed in. Please review your Permalinks settings and re-save them.', 'open-migration-unlimited-site-transfer-backup' ),
+			'importDone'         => __( 'Import complete.', 'open-migration-unlimited-site-transfer-backup' ),
+			'modalTitle'         => __( 'Please confirm', 'open-migration-unlimited-site-transfer-backup' ),
+			'modalNotice'        => __( 'Open Migration', 'open-migration-unlimited-site-transfer-backup' ),
+			'modalOk'            => __( 'OK', 'open-migration-unlimited-site-transfer-backup' ),
+			'modalCancel'        => __( 'Cancel', 'open-migration-unlimited-site-transfer-backup' ),
+			'modalContinue'      => __( 'Continue', 'open-migration-unlimited-site-transfer-backup' ),
+			'confirmImportTitle' => __( 'Overwrite this site?', 'open-migration-unlimited-site-transfer-backup' ),
+			'confirmImportBtn'   => __( 'Overwrite this site', 'open-migration-unlimited-site-transfer-backup' ),
+			'confirmDomainTitle' => __( 'Change the site address?', 'open-migration-unlimited-site-transfer-backup' ),
+			'confirmDomainBtn'   => __( 'Change domain', 'open-migration-unlimited-site-transfer-backup' ),
+			'confirmDeleteTitle' => __( 'Delete this backup?', 'open-migration-unlimited-site-transfer-backup' ),
+			'confirmDeleteBtn'   => __( 'Delete backup', 'open-migration-unlimited-site-transfer-backup' ),
+			'compatTitle'        => __( 'Check before continuing', 'open-migration-unlimited-site-transfer-backup' ),
+			'confirmDomain'      => __( 'This rewrites every reference across the whole database and cannot be undone. Continue?', 'open-migration-unlimited-site-transfer-backup' ),
+			'confirmDomainFrom'  => __( 'Change this site’s address?', 'open-migration-unlimited-site-transfer-backup' ),
+			'dnsChecking'        => __( 'Checking whether that address reaches this server…', 'open-migration-unlimited-site-transfer-backup' ),
+			'dnsWarnMismatch'    => __( 'WARNING: the DNS check said that address does NOT point to this server. Continuing will take this site offline.', 'open-migration-unlimited-site-transfer-backup' ),
+			'dnsWarnUnchecked'   => __( 'You have not confirmed that this address points to this server. Use "Check DNS" first if you are unsure.', 'open-migration-unlimited-site-transfer-backup' ),
+			'domainDone'         => __( 'Domain changed.', 'open-migration-unlimited-site-transfer-backup' ),
+			'domainRelogin'      => __( 'You are now signed out of this address. Open the new one and log in again, then re-save Settings → Permalinks.', 'open-migration-unlimited-site-transfer-backup' ),
+			'domainGoTo'         => __( 'Go to the new address', 'open-migration-unlimited-site-transfer-backup' ),
+			'rowsUpdated'        => __( 'database rows updated', 'open-migration-unlimited-site-transfer-backup' ),
 		);
 	}
 
@@ -343,7 +346,18 @@ class OWPM_Admin {
 			<span class="owpm-step-n"><?php echo esc_html( $number ); ?></span>
 			<div class="owpm-step-body">
 				<strong><?php echo esc_html( $title ); ?></strong>
-				<p><?php echo wp_kses( $body, array( 'code' => array(), 'strong' => array(), 'em' => array() ) ); ?></p>
+				<p>
+				<?php
+				echo wp_kses(
+					$body,
+					array(
+						'code'   => array(),
+						'strong' => array(),
+						'em'     => array(),
+					)
+				);
+				?>
+					</p>
 			</div>
 		</li>
 		<?php
@@ -377,7 +391,7 @@ class OWPM_Admin {
 	 */
 	public function render_admin_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You do not have permission to access this page.', 'open-migration' ), 403 );
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
 		}
 
 		global $wpdb;
@@ -388,7 +402,7 @@ class OWPM_Admin {
 
 			<noscript>
 				<div class="notice notice-error">
-					<p><?php esc_html_e( 'Open Migration needs JavaScript enabled to run.', 'open-migration' ); ?></p>
+					<p><?php esc_html_e( 'Open Migration needs JavaScript enabled to run.', 'open-migration-unlimited-site-transfer-backup' ); ?></p>
 				</div>
 			</noscript>
 
@@ -398,45 +412,45 @@ class OWPM_Admin {
 					<div class="owpm-brand">
 						<span class="owpm-logo dashicons dashicons-migrate" aria-hidden="true"></span>
 						<div>
-							<h1><?php esc_html_e( 'Open Migration', 'open-migration' ); ?></h1>
-							<p><?php esc_html_e( 'Move, clone and restore this site. No upload size limits.', 'open-migration' ); ?></p>
+							<h1><?php esc_html_e( 'Open Migration', 'open-migration-unlimited-site-transfer-backup' ); ?></h1>
+							<p><?php esc_html_e( 'Move, clone and restore this site. No upload size limits.', 'open-migration-unlimited-site-transfer-backup' ); ?></p>
 						</div>
 					</div>
 					<div class="owpm-meta">
-						<span class="owpm-chip" title="<?php esc_attr_e( 'The site you are currently working on', 'open-migration' ); ?>">
+						<span class="owpm-chip" title="<?php esc_attr_e( 'The site you are currently working on', 'open-migration-unlimited-site-transfer-backup' ); ?>">
 							<span class="dashicons dashicons-admin-site-alt3" aria-hidden="true"></span>
 							<?php echo esc_html( $host ); ?>
 						</span>
 						<span class="owpm-chip owpm-chip-quiet">
 							<?php
 							/* translators: %s: database table prefix. */
-							echo esc_html( sprintf( __( 'prefix %s', 'open-migration' ), $wpdb->prefix ) );
+							echo esc_html( sprintf( __( 'prefix %s', 'open-migration-unlimited-site-transfer-backup' ), $wpdb->prefix ) );
 							?>
 						</span>
 						<span class="owpm-chip owpm-chip-quiet">v<?php echo esc_html( OWPM_VERSION ); ?></span>
 					</div>
 				</header>
 
-				<nav class="owpm-tabs" role="tablist" aria-label="<?php esc_attr_e( 'Migration tools', 'open-migration' ); ?>">
+				<nav class="owpm-tabs" role="tablist" aria-label="<?php esc_attr_e( 'Migration tools', 'open-migration-unlimited-site-transfer-backup' ); ?>">
 					<button type="button" class="owpm-tab active" data-target="export" role="tab" aria-selected="true" aria-controls="panel-export">
 						<span class="dashicons dashicons-download" aria-hidden="true"></span>
-						<?php esc_html_e( 'Export', 'open-migration' ); ?>
+						<?php esc_html_e( 'Export', 'open-migration-unlimited-site-transfer-backup' ); ?>
 					</button>
 					<button type="button" class="owpm-tab" data-target="import" role="tab" aria-selected="false" aria-controls="panel-import">
 						<span class="dashicons dashicons-upload" aria-hidden="true"></span>
-						<?php esc_html_e( 'Import', 'open-migration' ); ?>
+						<?php esc_html_e( 'Import', 'open-migration-unlimited-site-transfer-backup' ); ?>
 					</button>
 					<button type="button" class="owpm-tab" data-target="site-to-site" role="tab" aria-selected="false" aria-controls="panel-site-to-site">
 						<span class="dashicons dashicons-networking" aria-hidden="true"></span>
-						<?php esc_html_e( 'Site-to-Site', 'open-migration' ); ?>
+						<?php esc_html_e( 'Site-to-Site', 'open-migration-unlimited-site-transfer-backup' ); ?>
 					</button>
 					<button type="button" class="owpm-tab" data-target="domain" role="tab" aria-selected="false" aria-controls="panel-domain">
 						<span class="dashicons dashicons-admin-links" aria-hidden="true"></span>
-						<?php esc_html_e( 'Change Domain', 'open-migration' ); ?>
+						<?php esc_html_e( 'Change Domain', 'open-migration-unlimited-site-transfer-backup' ); ?>
 					</button>
 					<button type="button" class="owpm-tab" data-target="backups" role="tab" aria-selected="false" aria-controls="panel-backups">
 						<span class="dashicons dashicons-database" aria-hidden="true"></span>
-						<?php esc_html_e( 'Backups', 'open-migration' ); ?>
+						<?php esc_html_e( 'Backups', 'open-migration-unlimited-site-transfer-backup' ); ?>
 					</button>
 				</nav>
 
@@ -445,68 +459,68 @@ class OWPM_Admin {
 					<?php /* ---------------------------------------------- EXPORT */ ?>
 					<section id="panel-export" class="owpm-panel active" role="tabpanel" tabindex="0">
 						<div class="owpm-panel-head">
-							<h2><?php esc_html_e( 'Export this site', 'open-migration' ); ?></h2>
-							<?php $this->docs_link( 'export', __( 'Export documentation', 'open-migration' ) ); ?>
+							<h2><?php esc_html_e( 'Export this site', 'open-migration-unlimited-site-transfer-backup' ); ?></h2>
+							<?php $this->docs_link( 'export', __( 'Export documentation', 'open-migration-unlimited-site-transfer-backup' ) ); ?>
 							<p class="owpm-lead">
-								<?php esc_html_e( 'Package the database and everything in wp-content into a single .zip file you can download, archive, or restore onto another WordPress install.', 'open-migration' ); ?>
+								<?php esc_html_e( 'Package the database and everything in wp-content into a single .zip file you can download, archive, or restore onto another WordPress install.', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</p>
 						</div>
 
 						<div class="owpm-status-card" id="owpm-system-status">
 							<div class="owpm-status-head">
 								<span class="dashicons dashicons-shield-alt" aria-hidden="true"></span>
-								<strong><?php esc_html_e( 'Server check', 'open-migration' ); ?></strong>
-								<span class="owpm-status-summary" id="owpm-status-summary"><?php esc_html_e( 'Checking…', 'open-migration' ); ?></span>
+								<strong><?php esc_html_e( 'Server check', 'open-migration-unlimited-site-transfer-backup' ); ?></strong>
+								<span class="owpm-status-summary" id="owpm-status-summary"><?php esc_html_e( 'Checking…', 'open-migration-unlimited-site-transfer-backup' ); ?></span>
 							</div>
 							<div class="owpm-status-grid" id="owpm-status-grid"></div>
 						</div>
 
 						<div class="owpm-actions">
 							<button type="button" class="owpm-btn owpm-btn-primary" id="owpm-start-export">
-								<?php esc_html_e( 'Start Export', 'open-migration' ); ?>
+								<?php esc_html_e( 'Start Export', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</button>
 						</div>
 
 						<?php $this->progress_block( 'export' ); ?>
 
-						<?php $this->accordion_open( __( 'How it works, and what is included', 'open-migration' ) ); ?>
+						<?php $this->accordion_open( __( 'How it works, and what is included', 'open-migration-unlimited-site-transfer-backup' ) ); ?>
 							<ol class="owpm-steps">
 								<?php
 								$this->step(
 									1,
-									__( 'Click Start Export', 'open-migration' ),
-									__( 'Your database is dumped and your files are zipped in small batches, so the request never times out — even on a large site.', 'open-migration' )
+									__( 'Click Start Export', 'open-migration-unlimited-site-transfer-backup' ),
+									__( 'Your database is dumped and your files are zipped in small batches, so the request never times out — even on a large site.', 'open-migration-unlimited-site-transfer-backup' )
 								);
 								$this->step(
 									2,
-									__( 'Wait for it to finish', 'open-migration' ),
-									__( 'Keep this tab open. Progress is shown above and you can see exactly which file is being packaged.', 'open-migration' )
+									__( 'Wait for it to finish', 'open-migration-unlimited-site-transfer-backup' ),
+									__( 'Keep this tab open. Progress is shown above and you can see exactly which file is being packaged.', 'open-migration-unlimited-site-transfer-backup' )
 								);
 								$this->step(
 									3,
-									__( 'Download the .zip', 'open-migration' ),
-									__( 'The archive also stays on this server under the <code>Backups</code> tab until you delete it.', 'open-migration' )
+									__( 'Download the .zip', 'open-migration-unlimited-site-transfer-backup' ),
+									__( 'The archive also stays on this server under the <code>Backups</code> tab until you delete it.', 'open-migration-unlimited-site-transfer-backup' )
 								);
 								?>
 							</ol>
 
 							<div class="owpm-included">
 								<div class="owpm-included-col">
-									<h4><span class="dashicons dashicons-yes-alt" aria-hidden="true"></span> <?php esc_html_e( 'Included', 'open-migration' ); ?></h4>
+									<h4><span class="dashicons dashicons-yes-alt" aria-hidden="true"></span> <?php esc_html_e( 'Included', 'open-migration-unlimited-site-transfer-backup' ); ?></h4>
 									<ul>
-										<li><?php esc_html_e( 'All database tables for this site', 'open-migration' ); ?></li>
-										<li><?php esc_html_e( 'Themes and plugins', 'open-migration' ); ?></li>
-										<li><?php esc_html_e( 'Uploads and media library', 'open-migration' ); ?></li>
-										<li><?php esc_html_e( 'Site URL, path and prefix, for automatic conversion', 'open-migration' ); ?></li>
+										<li><?php esc_html_e( 'All database tables for this site', 'open-migration-unlimited-site-transfer-backup' ); ?></li>
+										<li><?php esc_html_e( 'Themes and plugins', 'open-migration-unlimited-site-transfer-backup' ); ?></li>
+										<li><?php esc_html_e( 'Uploads and media library', 'open-migration-unlimited-site-transfer-backup' ); ?></li>
+										<li><?php esc_html_e( 'Site URL, path and prefix, for automatic conversion', 'open-migration-unlimited-site-transfer-backup' ); ?></li>
 									</ul>
 								</div>
 								<div class="owpm-included-col">
-									<h4><span class="dashicons dashicons-dismiss" aria-hidden="true"></span> <?php esc_html_e( 'Not included', 'open-migration' ); ?></h4>
+									<h4><span class="dashicons dashicons-dismiss" aria-hidden="true"></span> <?php esc_html_e( 'Not included', 'open-migration-unlimited-site-transfer-backup' ); ?></h4>
 									<ul>
-										<li><?php esc_html_e( 'wp-config.php and your database password', 'open-migration' ); ?></li>
-										<li><?php esc_html_e( 'WordPress core files', 'open-migration' ); ?></li>
-										<li><?php esc_html_e( 'Cache, upgrade and transient data', 'open-migration' ); ?></li>
-										<li><?php esc_html_e( 'Other plugins’ backup folders', 'open-migration' ); ?></li>
+										<li><?php esc_html_e( 'wp-config.php and your database password', 'open-migration-unlimited-site-transfer-backup' ); ?></li>
+										<li><?php esc_html_e( 'WordPress core files', 'open-migration-unlimited-site-transfer-backup' ); ?></li>
+										<li><?php esc_html_e( 'Cache, upgrade and transient data', 'open-migration-unlimited-site-transfer-backup' ); ?></li>
+										<li><?php esc_html_e( 'Other plugins’ backup folders', 'open-migration-unlimited-site-transfer-backup' ); ?></li>
 									</ul>
 								</div>
 							</div>
@@ -516,22 +530,22 @@ class OWPM_Admin {
 					<?php /* ---------------------------------------------- IMPORT */ ?>
 					<section id="panel-import" class="owpm-panel" role="tabpanel" tabindex="0">
 						<div class="owpm-panel-head">
-							<h2><?php esc_html_e( 'Import a site', 'open-migration' ); ?></h2>
-							<?php $this->docs_link( 'import', __( 'Import documentation', 'open-migration' ) ); ?>
+							<h2><?php esc_html_e( 'Import a site', 'open-migration-unlimited-site-transfer-backup' ); ?></h2>
+							<?php $this->docs_link( 'import', __( 'Import documentation', 'open-migration-unlimited-site-transfer-backup' ) ); ?>
 							<p class="owpm-lead">
-								<?php esc_html_e( 'Restore an Open Migration .zip onto this install. You do not need to prepare anything first — a brand new WordPress works fine.', 'open-migration' ); ?>
+								<?php esc_html_e( 'Restore an Open Migration .zip onto this install. You do not need to prepare anything first — a brand new WordPress works fine.', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</p>
 						</div>
 
 						<div class="owpm-alert owpm-alert-danger">
 							<span class="dashicons dashicons-warning" aria-hidden="true"></span>
 							<div>
-								<strong><?php esc_html_e( 'This replaces the current site.', 'open-migration' ); ?></strong>
+								<strong><?php esc_html_e( 'This replaces the current site.', 'open-migration-unlimited-site-transfer-backup' ); ?></strong>
 								<p>
 									<?php
 									printf(
 										/* translators: %s: the current site host name. */
-										esc_html__( 'Everything on %s — its posts, users, themes, plugins and media — will be overwritten by the contents of the archive. This cannot be undone. Export a backup of this site first if you might need it.', 'open-migration' ),
+										esc_html__( 'Everything on %s — its posts, users, themes, plugins and media — will be overwritten by the contents of the archive. This cannot be undone. Export a backup of this site first if you might need it.', 'open-migration-unlimited-site-transfer-backup' ),
 										'<code>' . esc_html( $host ) . '</code>'
 									);
 									?>
@@ -541,33 +555,33 @@ class OWPM_Admin {
 
 						<div class="owpm-upload-area" id="owpm-drop-zone">
 							<span class="dashicons dashicons-cloud-upload owpm-upload-icon" aria-hidden="true"></span>
-							<p class="owpm-drop-title"><?php esc_html_e( 'Drag &amp; drop your backup here', 'open-migration' ); ?></p>
-							<p class="owpm-drop-sub"><?php esc_html_e( 'Accepts .zip files of any size', 'open-migration' ); ?></p>
+							<p class="owpm-drop-title"><?php esc_html_e( 'Drag &amp; drop your backup here', 'open-migration-unlimited-site-transfer-backup' ); ?></p>
+							<p class="owpm-drop-sub"><?php esc_html_e( 'Accepts .zip files of any size', 'open-migration-unlimited-site-transfer-backup' ); ?></p>
 							<button type="button" class="owpm-btn owpm-btn-secondary" id="owpm-trigger-file">
-								<?php esc_html_e( 'Select File', 'open-migration' ); ?>
+								<?php esc_html_e( 'Select File', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</button>
 							<input type="file" id="owpm-import-file" accept=".zip,application/zip" />
 						</div>
 
 						<?php $this->progress_block( 'import' ); ?>
 
-						<?php $this->accordion_open( __( 'What happens during an import', 'open-migration' ) ); ?>
+						<?php $this->accordion_open( __( 'What happens during an import', 'open-migration-unlimited-site-transfer-backup' ) ); ?>
 							<ol class="owpm-steps">
 								<?php
 								$this->step(
 									1,
-									__( 'Add your backup file', 'open-migration' ),
-									__( 'Drag the <code>.zip</code> onto the box above, or click Select File. It is uploaded in small chunks, so your host’s upload limit does not apply.', 'open-migration' )
+									__( 'Add your backup file', 'open-migration-unlimited-site-transfer-backup' ),
+									__( 'Drag the <code>.zip</code> onto the box above, or click Select File. It is uploaded in small chunks, so your host’s upload limit does not apply.', 'open-migration-unlimited-site-transfer-backup' )
 								);
 								$this->step(
 									2,
-									__( 'The restore runs automatically', 'open-migration' ),
-									__( 'Files are extracted, the database is restored, and then the old site URL, server path and table prefix are converted to match this install.', 'open-migration' )
+									__( 'The restore runs automatically', 'open-migration-unlimited-site-transfer-backup' ),
+									__( 'Files are extracted, the database is restored, and then the old site URL, server path and table prefix are converted to match this install.', 'open-migration-unlimited-site-transfer-backup' )
 								);
 								$this->step(
 									3,
-									__( 'Log in with the old site’s account', 'open-migration' ),
-									__( 'The archive brings its own user accounts, so your current login stops working. Then open Settings → Permalinks and click Save once.', 'open-migration' )
+									__( 'Log in with the old site’s account', 'open-migration-unlimited-site-transfer-backup' ),
+									__( 'The archive brings its own user accounts, so your current login stops working. Then open Settings → Permalinks and click Save once.', 'open-migration-unlimited-site-transfer-backup' )
 								);
 								?>
 							</ol>
@@ -577,37 +591,37 @@ class OWPM_Admin {
 					<?php /* ---------------------------------------------- SITE TO SITE */ ?>
 					<section id="panel-site-to-site" class="owpm-panel" role="tabpanel" tabindex="0">
 						<div class="owpm-panel-head">
-							<h2><?php esc_html_e( 'Direct site-to-site transfer', 'open-migration' ); ?></h2>
-							<?php $this->docs_link( 'site-to-site', __( 'Site-to-site documentation', 'open-migration' ) ); ?>
+							<h2><?php esc_html_e( 'Direct site-to-site transfer', 'open-migration-unlimited-site-transfer-backup' ); ?></h2>
+							<?php $this->docs_link( 'site-to-site', __( 'Site-to-site documentation', 'open-migration-unlimited-site-transfer-backup' ) ); ?>
 							<p class="owpm-lead">
-								<?php esc_html_e( 'Move a site straight from one server to another without downloading anything. The destination pulls the archive over the WordPress REST API.', 'open-migration' ); ?>
+								<?php esc_html_e( 'Move a site straight from one server to another without downloading anything. The destination pulls the archive over the WordPress REST API.', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</p>
 						</div>
 
 						<div class="owpm-alert owpm-alert-info">
 							<span class="dashicons dashicons-info-outline" aria-hidden="true"></span>
 							<div>
-								<p><?php esc_html_e( 'Use the blue box on the OLD site, then the orange box on the NEW site. The old site’s REST API must be reachable from the new server.', 'open-migration' ); ?></p>
+								<p><?php esc_html_e( 'Use the blue box on the OLD site, then the orange box on the NEW site. The old site’s REST API must be reachable from the new server.', 'open-migration-unlimited-site-transfer-backup' ); ?></p>
 							</div>
 						</div>
 
 						<div class="owpm-box owpm-box-blue">
-							<h3><span class="owpm-step-n">1</span> <?php esc_html_e( 'On the OLD site — generate a token', 'open-migration' ); ?></h3>
-							<p><?php esc_html_e( 'This builds a full backup here, then gives you a one-time token that is valid for 24 hours.', 'open-migration' ); ?></p>
+							<h3><span class="owpm-step-n">1</span> <?php esc_html_e( 'On the OLD site — generate a token', 'open-migration-unlimited-site-transfer-backup' ); ?></h3>
+							<p><?php esc_html_e( 'This builds a full backup here, then gives you a one-time token that is valid for 24 hours.', 'open-migration-unlimited-site-transfer-backup' ); ?></p>
 							<button type="button" class="owpm-btn owpm-btn-secondary" id="owpm-generate-token">
-								<?php esc_html_e( 'Build Backup &amp; Generate Token', 'open-migration' ); ?>
+								<?php esc_html_e( 'Build Backup &amp; Generate Token', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</button>
 							<?php $this->progress_block( 'token' ); ?>
 							<div id="owpm-token-output"></div>
 						</div>
 
 						<div class="owpm-box owpm-box-orange">
-							<h3><span class="owpm-step-n">2</span> <?php esc_html_e( 'On the NEW site — paste the token', 'open-migration' ); ?></h3>
-							<p><?php esc_html_e( 'Paste the token from the old site. This server downloads the archive and restores it, replacing everything currently here.', 'open-migration' ); ?></p>
-							<label class="screen-reader-text" for="owpm-import-token"><?php esc_html_e( 'Migration token', 'open-migration' ); ?></label>
-							<input type="text" id="owpm-import-token" placeholder="<?php esc_attr_e( 'Paste migration token here…', 'open-migration' ); ?>" autocomplete="off" spellcheck="false" />
+							<h3><span class="owpm-step-n">2</span> <?php esc_html_e( 'On the NEW site — paste the token', 'open-migration-unlimited-site-transfer-backup' ); ?></h3>
+							<p><?php esc_html_e( 'Paste the token from the old site. This server downloads the archive and restores it, replacing everything currently here.', 'open-migration-unlimited-site-transfer-backup' ); ?></p>
+							<label class="screen-reader-text" for="owpm-import-token"><?php esc_html_e( 'Migration token', 'open-migration-unlimited-site-transfer-backup' ); ?></label>
+							<input type="text" id="owpm-import-token" placeholder="<?php esc_attr_e( 'Paste migration token here…', 'open-migration-unlimited-site-transfer-backup' ); ?>" autocomplete="off" spellcheck="false" />
 							<button type="button" class="owpm-btn owpm-btn-primary" id="owpm-start-pull">
-								<?php esc_html_e( 'Start Pull Transfer', 'open-migration' ); ?>
+								<?php esc_html_e( 'Start Pull Transfer', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</button>
 							<?php $this->progress_block( 'pull' ); ?>
 						</div>
@@ -616,19 +630,19 @@ class OWPM_Admin {
 					<?php /* ---------------------------------------------- CHANGE DOMAIN */ ?>
 					<section id="panel-domain" class="owpm-panel" role="tabpanel" tabindex="0">
 						<div class="owpm-panel-head">
-							<h2><?php esc_html_e( 'Change this site’s domain', 'open-migration' ); ?></h2>
-							<?php $this->docs_link( 'change-domain', __( 'Domain change documentation', 'open-migration' ) ); ?>
+							<h2><?php esc_html_e( 'Change this site’s domain', 'open-migration-unlimited-site-transfer-backup' ); ?></h2>
+							<?php $this->docs_link( 'change-domain', __( 'Domain change documentation', 'open-migration-unlimited-site-transfer-backup' ) ); ?>
 							<p class="owpm-lead">
-								<?php esc_html_e( 'Rewrites every reference to this site’s current address across the whole database — posts, options, widgets, page-builder data and serialised values included.', 'open-migration' ); ?>
+								<?php esc_html_e( 'Rewrites every reference to this site’s current address across the whole database — posts, options, widgets, page-builder data and serialised values included.', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</p>
 						</div>
 
 						<div class="owpm-alert owpm-alert-info">
 							<span class="dashicons dashicons-info-outline" aria-hidden="true"></span>
 							<div>
-								<strong><?php esc_html_e( 'Migrated to a new host before pointing DNS? This is the step you need.', 'open-migration' ); ?></strong>
+								<strong><?php esc_html_e( 'Migrated to a new host before pointing DNS? This is the step you need.', 'open-migration-unlimited-site-transfer-backup' ); ?></strong>
 								<p>
-									<?php esc_html_e( 'If you imported this site while it was still on a temporary address (for example site.yourhost.com, a staging subdomain, or a raw IP), the database is full of that temporary address. WordPress only ever sees the hostname a visitor requested, so it cannot tell that DNS has since been pointed at the real domain — it will keep redirecting visitors back to the temporary one until you make the change here.', 'open-migration' ); ?>
+									<?php esc_html_e( 'If you imported this site while it was still on a temporary address (for example site.yourhost.com, a staging subdomain, or a raw IP), the database is full of that temporary address. WordPress only ever sees the hostname a visitor requested, so it cannot tell that DNS has since been pointed at the real domain — it will keep redirecting visitors back to the temporary one until you make the change here.', 'open-migration-unlimited-site-transfer-backup' ); ?>
 								</p>
 							</div>
 						</div>
@@ -643,12 +657,12 @@ class OWPM_Admin {
 
 						<div class="owpm-swap">
 							<div class="owpm-swap-side">
-								<span class="owpm-swap-label"><?php esc_html_e( 'Current address', 'open-migration' ); ?></span>
+								<span class="owpm-swap-label"><?php esc_html_e( 'Current address', 'open-migration-unlimited-site-transfer-backup' ); ?></span>
 								<code class="owpm-swap-url" id="owpm-domain-current"><?php echo esc_html( $current_url ); ?></code>
 							</div>
 							<span class="owpm-swap-arrow dashicons dashicons-arrow-right-alt" aria-hidden="true"></span>
 							<div class="owpm-swap-side">
-								<span class="owpm-swap-label"><?php esc_html_e( 'New address', 'open-migration' ); ?></span>
+								<span class="owpm-swap-label"><?php esc_html_e( 'New address', 'open-migration-unlimited-site-transfer-backup' ); ?></span>
 								<code class="owpm-swap-url owpm-swap-new" id="owpm-domain-preview">&mdash;</code>
 							</div>
 						</div>
@@ -657,7 +671,7 @@ class OWPM_Admin {
 							<div class="owpm-suggestions" id="owpm-domain-suggestions">
 								<span class="owpm-suggestions-title">
 									<span class="dashicons dashicons-lightbulb" aria-hidden="true"></span>
-									<?php esc_html_e( 'Detected addresses', 'open-migration' ); ?>
+									<?php esc_html_e( 'Detected addresses', 'open-migration-unlimited-site-transfer-backup' ); ?>
 								</span>
 								<?php foreach ( $candidates as $candidate ) : ?>
 									<button type="button" class="owpm-candidate owpm-use-domain"
@@ -670,20 +684,20 @@ class OWPM_Admin {
 							</div>
 						<?php else : ?>
 							<p class="owpm-no-candidates">
-								<?php esc_html_e( 'No previous address could be detected automatically, so type the new one below. That is normal if this site was not imported with this plugin — once an import runs, the address it came from is remembered here.', 'open-migration' ); ?>
+								<?php esc_html_e( 'No previous address could be detected automatically, so type the new one below. That is normal if this site was not imported with this plugin — once an import runs, the address it came from is remembered here.', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</p>
 						<?php endif; ?>
 
 						<div class="owpm-domain-form">
-							<label class="screen-reader-text" for="owpm-new-domain"><?php esc_html_e( 'New address', 'open-migration' ); ?></label>
+							<label class="screen-reader-text" for="owpm-new-domain"><?php esc_html_e( 'New address', 'open-migration-unlimited-site-transfer-backup' ); ?></label>
 							<input type="text" id="owpm-new-domain" placeholder="https://example.com"
 								autocomplete="off" spellcheck="false"
 								<?php echo $first ? 'value="' . esc_attr( $first ) . '"' : ''; ?> />
 							<button type="button" class="owpm-btn owpm-btn-secondary" id="owpm-check-domain">
-								<?php esc_html_e( 'Check DNS', 'open-migration' ); ?>
+								<?php esc_html_e( 'Check DNS', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</button>
 							<button type="button" class="owpm-btn owpm-btn-primary" id="owpm-run-domain">
-								<?php esc_html_e( 'Change Domain', 'open-migration' ); ?>
+								<?php esc_html_e( 'Change Domain', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</button>
 						</div>
 
@@ -691,23 +705,23 @@ class OWPM_Admin {
 
 						<?php $this->progress_block( 'domain' ); ?>
 
-						<?php $this->accordion_open( __( 'How this works, and what to do first', 'open-migration' ) ); ?>
+						<?php $this->accordion_open( __( 'How this works, and what to do first', 'open-migration-unlimited-site-transfer-backup' ) ); ?>
 							<ol class="owpm-steps">
 								<?php
 								$this->step(
 									1,
-									__( 'Point your DNS at this server first', 'open-migration' ),
-									__( 'Finish the DNS change at your registrar and wait until the real domain actually loads this site. Use <strong>Check DNS</strong> above to confirm before you commit.', 'open-migration' )
+									__( 'Point your DNS at this server first', 'open-migration-unlimited-site-transfer-backup' ),
+									__( 'Finish the DNS change at your registrar and wait until the real domain actually loads this site. Use <strong>Check DNS</strong> above to confirm before you commit.', 'open-migration-unlimited-site-transfer-backup' )
 								);
 								$this->step(
 									2,
-									__( 'Take a backup', 'open-migration' ),
-									__( 'This rewrites data across every table and there is no undo. If you enter the wrong address and can still reach the site, you can run it again in reverse.', 'open-migration' )
+									__( 'Take a backup', 'open-migration-unlimited-site-transfer-backup' ),
+									__( 'This rewrites data across every table and there is no undo. If you enter the wrong address and can still reach the site, you can run it again in reverse.', 'open-migration-unlimited-site-transfer-backup' )
 								);
 								$this->step(
 									3,
-									__( 'Sign in again on the new domain', 'open-migration' ),
-									__( 'Your login cookie belongs to the old address, so you will need to log in once at the new one. Then re-save Settings → Permalinks.', 'open-migration' )
+									__( 'Sign in again on the new domain', 'open-migration-unlimited-site-transfer-backup' ),
+									__( 'Your login cookie belongs to the old address, so you will need to log in once at the new one. Then re-save Settings → Permalinks.', 'open-migration-unlimited-site-transfer-backup' )
 								);
 								?>
 							</ol>
@@ -717,14 +731,14 @@ class OWPM_Admin {
 					<?php /* ---------------------------------------------- BACKUPS */ ?>
 					<section id="panel-backups" class="owpm-panel" role="tabpanel" tabindex="0">
 						<div class="owpm-panel-head">
-							<h2><?php esc_html_e( 'Backups on this server', 'open-migration' ); ?></h2>
-							<?php $this->docs_link( 'backups', __( 'Backup documentation', 'open-migration' ) ); ?>
+							<h2><?php esc_html_e( 'Backups on this server', 'open-migration-unlimited-site-transfer-backup' ); ?></h2>
+							<?php $this->docs_link( 'backups', __( 'Backup documentation', 'open-migration-unlimited-site-transfer-backup' ) ); ?>
 							<p class="owpm-lead">
 								<?php
 								printf(
 									/* translators: %s: backup directory path. */
-									esc_html__( 'Stored in %s. That folder is locked down and downloads are served through WordPress after a permission check, so nobody can grab your backups by guessing the URL.', 'open-migration' ),
-									'<code>wp-content/uploads/owpm-backups/</code>'
+									esc_html__( 'Stored in %s. That folder is locked down and downloads are served through WordPress after a permission check, so nobody can grab your backups by guessing the URL.', 'open-migration-unlimited-site-transfer-backup' ),
+									'<code>wp-content/uploads/open-migration-unlimited-site-transfer-backup/</code>'
 								);
 								?>
 							</p>
@@ -750,7 +764,7 @@ class OWPM_Admin {
 					<?php
 					printf(
 						/* translators: %s: link to the plugin author's website. */
-						esc_html__( 'Open Migration is free and open source, built by %s.', 'open-migration' ),
+						esc_html__( 'Open Migration is free and open source, built by %s.', 'open-migration-unlimited-site-transfer-backup' ),
 						'<a href="https://dicecodes.com/" target="_blank" rel="noopener noreferrer">DiceCodes</a>'
 					);
 					?>

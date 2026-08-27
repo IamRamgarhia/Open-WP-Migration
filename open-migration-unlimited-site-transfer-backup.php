@@ -1,16 +1,16 @@
 <?php
 /**
  * Plugin Name: Open Migration - Unlimited Site Transfer & Backup
- * Plugin URI:  https://dicecodes.com/
+ * Plugin URI:  https://dicecodes.com/open-migration/
  * Description: Move, clone, back up and restore a WordPress site with no upload size limit. URLs, server paths and table prefixes are converted automatically.
- * Version:     1.3.5
+ * Version:     1.3.12
  * Requires at least: 5.6
  * Requires PHP: 7.2
  * Author:      DiceCodes
  * Author URI:  https://dicecodes.com/
  * License:     GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: open-migration
+ * Text Domain: open-migration-unlimited-site-transfer-backup
  *
  * @package Open_Migration
  */
@@ -24,7 +24,7 @@ if ( defined( 'OWPM_VERSION' ) ) {
 	return;
 }
 
-define( 'OWPM_VERSION', '1.3.5' );
+define( 'OWPM_VERSION', '1.3.12' );
 define( 'OWPM_PLUGIN_FILE', __FILE__ );
 define( 'OWPM_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OWPM_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

@@ -15,11 +15,100 @@ if ( ! defined( 'ABSPATH' ) ) {
 class OWPM_FS {
 
 	/**
+	 * Folder inside uploads that holds backups. Named after the plugin slug, as
+	 * the directory guidelines recommend for plugin-created files.
+	 */
+	const BACKUP_DIR_NAME = 'open-migration-unlimited-site-transfer-backup';
+
+	/**
+	 * Top-level folder inside the archive holding uploads that lived outside the
+	 * content directory on the source. Restored into whatever wp_upload_dir()
+	 * reports on the destination, so a relocated uploads folder on either side
+	 * lands in the right place.
+	 */
+	const EXTERNAL_UPLOADS_ENTRY = 'owpm-uploads';
+
+	/**
 	 * Absolute path (trailing slash) of the working/backup directory.
+	 *
+	 * Always resolved through wp_upload_dir() rather than assembled from
+	 * WP_CONTENT_DIR, so it stays correct on installs with a custom uploads path.
 	 */
 	public static function backup_dir() {
 		$upload_dir = wp_upload_dir();
-		return trailingslashit( $upload_dir['basedir'] ) . 'owpm-backups/';
+
+		return trailingslashit( $upload_dir['basedir'] ) . self::BACKUP_DIR_NAME . '/';
+	}
+
+	/**
+	 * Path of the uploads directory itself, or '' if WordPress cannot report one.
+	 */
+	public static function uploads_dir() {
+		$upload_dir = wp_upload_dir();
+
+		if ( ! empty( $upload_dir['error'] ) || empty( $upload_dir['basedir'] ) ) {
+			return '';
+		}
+
+		return trailingslashit( $upload_dir['basedir'] );
+	}
+
+	/**
+	 * Absolute path (trailing slash) of the content directory.
+	 *
+	 * WP_CONTENT_DIR is the API for this: it is the documented way to locate the
+	 * content directory, and it already reflects a relocated wp-content. It is
+	 * read here and nowhere else, so there is a single place to audit.
+	 *
+	 * This is never used to find the plugin's own files -- those come from
+	 * plugin_dir_path()/OWPM_PLUGIN_DIR -- nor to find uploads, which come from
+	 * wp_upload_dir(). It identifies the directory being archived and restored.
+	 */
+	public static function content_dir() {
+		return trailingslashit( str_replace( '\\', '/', WP_CONTENT_DIR ) );
+	}
+
+	/**
+	 * Name of the content directory, e.g. 'wp-content' or a renamed one.
+	 */
+	public static function content_name() {
+		return basename( untrailingslashit( self::content_dir() ) );
+	}
+
+	/**
+	 * Absolute path (trailing slash) of the WordPress root.
+	 *
+	 * Recorded in the archive so absolute paths stored in the source database can
+	 * be rewritten to the destination's root on restore. ABSPATH is the only way
+	 * to obtain it; get_home_path() reports the home directory, which differs when
+	 * WordPress lives in a subdirectory, and is admin-only.
+	 */
+	public static function root_dir() {
+		return trailingslashit( str_replace( '\\', '/', ABSPATH ) );
+	}
+
+	/**
+	 * Uploads directory, but only when it sits outside the content directory.
+	 *
+	 * Uploads can be relocated with the UPLOADS constant or the upload_path
+	 * option. When that happens, walking the content directory alone misses every
+	 * uploaded file, so the export has to treat uploads as a second root. Returns
+	 * '' on the usual layout, where uploads are already covered.
+	 */
+	public static function external_uploads_dir() {
+		$uploads = self::uploads_dir();
+
+		if ( '' === $uploads ) {
+			return '';
+		}
+
+		$uploads = trailingslashit( str_replace( '\\', '/', $uploads ) );
+
+		if ( 0 === strpos( $uploads, self::content_dir() ) ) {
+			return '';
+		}
+
+		return $uploads;
 	}
 
 	/**
@@ -73,13 +162,13 @@ class OWPM_FS {
 	 */
 	private static function put_contents_if_changed( $path, $content ) {
 		if ( file_exists( $path ) ) {
-			$current = @file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			$current = @file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents, WordPress.PHP.NoSilencedErrors.Discouraged
 			if ( false !== $current && $current === $content ) {
 				return;
 			}
 		}
 
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, WordPress.PHP.NoSilencedErrors.Discouraged
 		@file_put_contents( $path, $content, LOCK_EX );
 	}
 
@@ -165,10 +254,10 @@ class OWPM_FS {
 		}
 
 		if ( is_file( $path ) || is_link( $path ) ) {
-			return @unlink( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			return @unlink( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink, WordPress.PHP.NoSilencedErrors.Discouraged
 		}
 
-		$items = @scandir( $path );
+		$items = @scandir( $path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- Return value is checked; an unsuppressed warning would corrupt the JSON body of the AJAX response.
 		if ( false !== $items ) {
 			foreach ( $items as $item ) {
 				if ( '.' === $item || '..' === $item ) {
@@ -195,7 +284,7 @@ class OWPM_FS {
 		}
 
 		if ( file_exists( $to ) && ! is_dir( $to ) ) {
-			@unlink( $to ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			@unlink( $to ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink, WordPress.PHP.NoSilencedErrors.Discouraged
 		}
 
 		// rename() is an atomic same-volume move; WP_Filesystem::move() cannot be
@@ -205,8 +294,8 @@ class OWPM_FS {
 			return true;
 		}
 
-		if ( @copy( $from, $to ) ) {
-			@unlink( $from ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+		if ( @copy( $from, $to ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- Return value is checked; an unsuppressed warning would corrupt the JSON body of the AJAX response.
+			@unlink( $from ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink, WordPress.PHP.NoSilencedErrors.Discouraged
 			return true;
 		}
 

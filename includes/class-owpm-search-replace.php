@@ -124,7 +124,7 @@ class OWPM_Search_Replace {
 		// guard is only a backstop against a pathological table.
 		while ( ! $state['done'] && $guard < 10000 ) {
 			$state = self::run_batch( $old_string, $new_string, $tables, $state, HOUR_IN_SECONDS );
-			$guard++;
+			++$guard;
 		}
 
 		return array(
@@ -188,7 +188,7 @@ class OWPM_Search_Replace {
 			$escaped = OWPM_FS::esc_table( $table );
 
 			if ( ! $escaped ) {
-				$state['table_index']++;
+				++$state['table_index'];
 				$state['offset'] = 0;
 				continue;
 			}
@@ -197,7 +197,7 @@ class OWPM_Search_Replace {
 
 			// Without a primary key we cannot target a row for update safely.
 			if ( empty( $schema['primary'] ) || empty( $schema['searchable'] ) ) {
-				$state['table_index']++;
+				++$state['table_index'];
 				$state['offset'] = 0;
 				continue;
 			}
@@ -226,7 +226,7 @@ class OWPM_Search_Replace {
 			$rows = $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A );
 
 			if ( empty( $rows ) ) {
-				$state['table_index']++;
+				++$state['table_index'];
 				$state['offset'] = 0;
 				continue;
 			}
@@ -254,7 +254,7 @@ class OWPM_Search_Replace {
 				}
 
 				if ( empty( $update ) ) {
-					$unchanged++;
+					++$unchanged;
 					continue;
 				}
 
@@ -269,7 +269,7 @@ class OWPM_Search_Replace {
 				}
 
 				if ( empty( $conditions ) ) {
-					$unchanged++;
+					++$unchanged;
 					continue;
 				}
 
@@ -277,7 +277,7 @@ class OWPM_Search_Replace {
 				$result = $wpdb->update( $table, $update, $conditions );
 
 				if ( false === $result ) {
-					$unchanged++;
+					++$unchanged;
 				} else {
 					$state['rows'] = (int) $state['rows'] + 1;
 				}
@@ -286,12 +286,11 @@ class OWPM_Search_Replace {
 			// Updated rows drop out of the LIKE result set, so the offset only needs
 			// to skip the rows we deliberately left in place.
 			if ( count( $rows ) < $page_size ) {
-				$state['table_index']++;
+				++$state['table_index'];
 				$state['offset'] = 0;
 			} else {
 				$state['offset'] = (int) $state['offset'] + $unchanged;
 			}
-
 		}
 
 		$state['done'] = true;
@@ -338,8 +337,18 @@ class OWPM_Search_Replace {
 			}
 
 			if ( is_serialized( $data ) ) {
-				// allowed_classes => false prevents object injection from untrusted dumps.
-				$unserialized = @unserialize( $data, array( 'allowed_classes' => false ) ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, PHPCompatibility.FunctionUse.NewFunctionParameters
+				// unserialize() is unavoidable here: rewriting a URL inside a
+				// PHP-serialised option means decoding it, replacing, and re-encoding
+				// so the string length prefixes stay valid. A plain str_replace()
+				// corrupts the value and breaks the option.
+				//
+				// The object-injection risk the sniff warns about is closed by
+				// allowed_classes => false, which is the mitigation OWASP recommends:
+				// no object is ever instantiated, so no __wakeup or __destruct from
+				// the data can run. Anything that was an object comes back as
+				// __PHP_Incomplete_Class and is left alone.
+				// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, PHPCompatibility.FunctionUse.NewFunctionParameters, WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize
+				$unserialized = @unserialize( $data, array( 'allowed_classes' => false ) );
 
 				// serialize(false) is the one case where false is a valid result.
 				if ( false !== $unserialized || 'b:0;' === $data ) {

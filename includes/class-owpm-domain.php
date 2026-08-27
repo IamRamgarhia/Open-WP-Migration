@@ -86,8 +86,8 @@ class OWPM_Domain {
 		if ( is_array( $last ) && ! empty( $last['source_url'] ) ) {
 			$add(
 				$last['source_url'],
-				__( 'The site this was imported from', 'open-migration' ),
-				__( 'Recorded when the backup was restored onto this install.', 'open-migration' )
+				__( 'The site this was imported from', 'open-migration-unlimited-site-transfer-backup' ),
+				__( 'Recorded when the backup was restored onto this install.', 'open-migration-unlimited-site-transfer-backup' )
 			);
 		}
 
@@ -103,10 +103,10 @@ class OWPM_Domain {
 			if ( $raw ) {
 				$add(
 					$raw,
-					__( 'Stored in the database', 'open-migration' ),
+					__( 'Stored in the database', 'open-migration-unlimited-site-transfer-backup' ),
 					sprintf(
 						/* translators: %s: the option name, siteurl or home. */
-						__( 'The %s option still holds this address, but wp-config.php is overriding it.', 'open-migration' ),
+						__( 'The %s option still holds this address, but wp-config.php is overriding it.', 'open-migration-unlimited-site-transfer-backup' ),
 						$option
 					)
 				);
@@ -117,8 +117,8 @@ class OWPM_Domain {
 		foreach ( self::backup_source_urls() as $url ) {
 			$add(
 				$url,
-				__( 'From a backup on this server', 'open-migration' ),
-				__( 'Read from the metadata inside an archive in your Backups tab.', 'open-migration' )
+				__( 'From a backup on this server', 'open-migration-unlimited-site-transfer-backup' ),
+				__( 'Read from the metadata inside an archive in your Backups tab.', 'open-migration-unlimited-site-transfer-backup' )
 			);
 		}
 
@@ -226,7 +226,7 @@ class OWPM_Domain {
 		}
 
 		if ( untrailingslashit( site_url() ) === $new_url ) {
-			wp_send_json_error( __( 'That is already this site’s address.', 'open-migration' ) );
+			wp_send_json_error( __( 'That is already this site’s address.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		$token = wp_generate_password( 32, false );
@@ -250,7 +250,7 @@ class OWPM_Domain {
 					'url'     => $new_url,
 					'message' => sprintf(
 						/* translators: %s: the address that was tested. */
-						__( 'Could not reach %s from this server. That may just mean your host blocks outgoing requests, so it is not proof of a problem — but confirm the address loads this site in your browser before continuing.', 'open-migration' ),
+						__( 'Could not reach %s from this server. That may just mean your host blocks outgoing requests, so it is not proof of a problem — but confirm the address loads this site in your browser before continuing.', 'open-migration-unlimited-site-transfer-backup' ),
 						$new_url
 					),
 				)
@@ -266,7 +266,7 @@ class OWPM_Domain {
 					'url'     => $new_url,
 					'message' => sprintf(
 						/* translators: %s: the address that was tested. */
-						__( '%s already points to this server. Safe to continue.', 'open-migration' ),
+						__( '%s already points to this server. Safe to continue.', 'open-migration-unlimited-site-transfer-backup' ),
 						$new_url
 					),
 				)
@@ -279,7 +279,7 @@ class OWPM_Domain {
 				'url'     => $new_url,
 				'message' => sprintf(
 					/* translators: %s: the address that was tested. */
-					__( '%s responded, but it is not this site. DNS is probably still pointing at your old host. Changing the address now would take this site offline.', 'open-migration' ),
+					__( '%s responded, but it is not this site. DNS is probably still pointing at your old host. Changing the address now would take this site offline.', 'open-migration-unlimited-site-transfer-backup' ),
 					$new_url
 				),
 			)
@@ -290,7 +290,7 @@ class OWPM_Domain {
 		check_ajax_referer( 'owpm_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration' ), 403 );
+			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
 		}
 
 		OWPM_FS::raise_limits();
@@ -305,7 +305,7 @@ class OWPM_Domain {
 		$raw = trim( (string) $raw );
 
 		if ( '' === $raw ) {
-			return new WP_Error( 'empty', __( 'Please enter the new site address.', 'open-migration' ) );
+			return new WP_Error( 'empty', __( 'Please enter the new site address.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		// Reject before esc_url_raw() gets a chance to "fix" the input. It strips
@@ -314,7 +314,7 @@ class OWPM_Domain {
 		// a mangled address here would rewrite the whole database to a domain that
 		// does not exist, which is precisely the mistake this tab must prevent.
 		if ( preg_match( '/\s/', $raw ) ) {
-			return new WP_Error( 'invalid', __( 'A web address cannot contain spaces. Check for a typo.', 'open-migration' ) );
+			return new WP_Error( 'invalid', __( 'A web address cannot contain spaces. Check for a typo.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		// A scheme is "word://". Anything else with a colon is either a host:port,
@@ -327,7 +327,7 @@ class OWPM_Domain {
 					'invalid',
 					sprintf(
 						/* translators: %s: the scheme the user typed, e.g. "ftp". */
-						__( '“%s://” is not supported. A site address must use http:// or https://.', 'open-migration' ),
+						__( '“%s://” is not supported. A site address must use http:// or https://.', 'open-migration-unlimited-site-transfer-backup' ),
 						$scheme
 					)
 				);
@@ -340,7 +340,7 @@ class OWPM_Domain {
 				'invalid',
 				sprintf(
 					/* translators: %s: the prefix the user typed, e.g. "htp". */
-					__( '“%s:” is not a valid address prefix. Use http:// or https://, or just type the domain on its own.', 'open-migration' ),
+					__( '“%s:” is not a valid address prefix. Use http:// or https://, or just type the domain on its own.', 'open-migration-unlimited-site-transfer-backup' ),
 					strtolower( $colon_match[1] )
 				)
 			);
@@ -352,7 +352,7 @@ class OWPM_Domain {
 		$parts = wp_parse_url( $raw );
 
 		if ( ! is_array( $parts ) || empty( $parts['host'] ) ) {
-			return new WP_Error( 'invalid', __( 'That address is missing a domain name.', 'open-migration' ) );
+			return new WP_Error( 'invalid', __( 'That address is missing a domain name.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		$host = strtolower( $parts['host'] );
@@ -362,7 +362,7 @@ class OWPM_Domain {
 				'invalid',
 				sprintf(
 					/* translators: %s: the host portion of what the user typed. */
-					__( '“%s” is not a valid domain name. Enter something like example.com. Internationalised domains must be entered in their punycode (xn--) form.', 'open-migration' ),
+					__( '“%s” is not a valid domain name. Enter something like example.com. Internationalised domains must be entered in their punycode (xn--) form.', 'open-migration-unlimited-site-transfer-backup' ),
 					$parts['host']
 				)
 			);
@@ -380,7 +380,7 @@ class OWPM_Domain {
 			$path = '/' . trim( $parts['path'], '/' );
 
 			if ( preg_match( '#(^|/)\.\.?(/|$)#', $path ) ) {
-				return new WP_Error( 'invalid', __( 'That address contains a relative path segment, which is not valid in a site address.', 'open-migration' ) );
+				return new WP_Error( 'invalid', __( 'That address contains a relative path segment, which is not valid in a site address.', 'open-migration-unlimited-site-transfer-backup' ) );
 			}
 
 			$clean .= $path;
@@ -442,7 +442,7 @@ class OWPM_Domain {
 		$old_home = untrailingslashit( home_url() );
 
 		if ( $old_url === $new_url ) {
-			wp_send_json_error( __( 'That is already this site’s address, so there is nothing to change.', 'open-migration' ) );
+			wp_send_json_error( __( 'That is already this site’s address, so there is nothing to change.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		// home_url() usually shares the site_url host; keep them in step.
@@ -456,7 +456,7 @@ class OWPM_Domain {
 		$pairs = OWPM_Search_Replace::build_url_pairs( $old_url, $new_url, $old_home, $new_home );
 
 		if ( empty( $pairs ) ) {
-			wp_send_json_error( __( 'Nothing to replace between those two addresses.', 'open-migration' ) );
+			wp_send_json_error( __( 'Nothing to replace between those two addresses.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		update_option(
@@ -499,7 +499,7 @@ class OWPM_Domain {
 		$job = get_option( self::STATE_OPTION );
 
 		if ( ! is_array( $job ) || empty( $job['pairs'] ) ) {
-			wp_send_json_error( __( 'No domain change is in progress. Please start again.', 'open-migration' ) );
+			wp_send_json_error( __( 'No domain change is in progress. Please start again.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		$pairs   = (array) $job['pairs'];
@@ -516,7 +516,7 @@ class OWPM_Domain {
 			if ( ! empty( $state['done'] ) ) {
 				$job['rows']  = (int) $job['rows'] + (int) $state['rows'];
 				$job['state'] = $this->fresh_state();
-				$index++;
+				++$index;
 			} else {
 				$job['state'] = $state;
 			}
@@ -556,11 +556,11 @@ class OWPM_Domain {
 
 		wp_send_json_success(
 			array(
-				'status'   => 'complete',
-				'progress' => 100,
-				'rows'     => (int) $job['rows'],
-				'old_url'  => $job['old_url'],
-				'new_url'  => $job['new_url'],
+				'status'    => 'complete',
+				'progress'  => 100,
+				'rows'      => (int) $job['rows'],
+				'old_url'   => $job['old_url'],
+				'new_url'   => $job['new_url'],
 				'admin_url' => trailingslashit( $job['new_url'] ) . 'wp-admin/',
 			)
 		);

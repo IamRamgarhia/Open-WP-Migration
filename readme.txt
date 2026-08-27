@@ -1,14 +1,14 @@
 === Open Migration - Unlimited Site Transfer & Backup ===
-Contributors: openmigration
+Contributors: dicecodes
 Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 1.3.5
+Stable tag: 1.3.12
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Move, clone, back up and restore a WordPress site with no upload size limit. URLs, paths and table prefixes are converted automatically.
+Migrate, clone, back up and restore a WordPress site with no upload size limit. URLs, paths and table prefixes are converted automatically.
 
 == Description ==
 
@@ -54,16 +54,44 @@ Open Migration is built and maintained by [DiceCodes](https://dicecodes.com/). I
 
 == Installation ==
 
-1. Upload the plugin folder to `/wp-content/plugins/open-migration`, or install it from the Plugins screen.
-2. Activate the plugin.
+1. In the WordPress admin, go to **Plugins - Add New**, search for **Open Migration**, and click **Install Now**. To install manually instead, upload the plugin folder to `/wp-content/plugins/open-migration-unlimited-site-transfer-backup/`.
+2. Click **Activate**.
 3. Open **Open Migration** in the admin menu.
 
-To move a site:
+Install it on **both** sites - the one you are moving from and the one you are moving to.
 
-1. On the old site, open the **Export** tab and click **Start Export**, then download the `.zip`.
-2. On the new site, open the **Import** tab and drop that `.zip` onto the upload area.
-3. Wait for the import to finish, then log in with the **old site's** username and password.
-4. Go to **Settings - Permalinks** and click **Save Changes** once.
+= Moving a site to a new host =
+
+1. On the **old** site, open the **Export** tab. Check the server report at the top, then click **Start Export** and wait. Large sites take a while; the progress bar keeps updating and the export resumes by itself if a request is interrupted.
+2. Download the finished `.zip`.
+3. On the **new** site - a plain, freshly installed WordPress is fine - open the **Import** tab and drop the `.zip` onto the upload area.
+4. Confirm the warning. The import replaces everything on the destination.
+5. When it finishes, log in with the **old site's** username and password. The old site's accounts have replaced the new site's.
+6. Go to **Settings - Permalinks** and click **Save Changes** once, to rebuild the rewrite rules.
+
+URLs, server paths and the table prefix are converted for you during step 4. There is nothing to search and replace afterwards.
+
+= Moving a site before DNS is switched =
+
+This is the usual case when changing hosts, and it needs one extra step at the end.
+
+1. Export and import exactly as above, using whatever temporary address the new host gave you - `site.yourhost.com`, a staging subdomain, or an IP.
+2. Check the site works at that temporary address.
+3. Point your domain's DNS at the new server and wait for it to resolve.
+4. Once the real domain loads the new server, open the **Change Domain** tab, enter the real address and run it.
+
+Do it in that order. Running Change Domain before DNS resolves leaves the site unreachable at both addresses. The tab shows the current address and runs a DNS check first, so it can warn you before anything is written.
+
+= Copying a site directly, without downloading anything =
+
+1. On the **source** site, open the **Site-to-Site** tab and generate a one-time token.
+2. On the **destination** site, paste the token into the same tab and start the pull.
+
+The destination fetches the archive straight from the source over the REST API and then runs the same automatic conversion. Nothing passes through your computer, which is useful on a slow connection or with a very large site.
+
+= Making a backup =
+
+Run an export and keep the `.zip`. Restore it later on the same site or any other one - the **Backups** tab lists everything stored on the server, with download and delete buttons.
 
 == Frequently Asked Questions ==
 
@@ -103,7 +131,7 @@ PHP 7.2 or newer with the ZipArchive extension enabled, and enough free disk spa
 
 = Where are backups stored, and can anyone download them? =
 
-In `wp-content/uploads/owpm-backups/`. That directory is protected with deny-all rules for Apache and IIS, carries an index file, and archive names include 32 random characters. Downloads are streamed through WordPress only after a capability and nonce check, so the folder never has to be publicly readable - which also keeps it safe on Nginx, where `.htaccess` files are ignored.
+In `wp-content/uploads/open-migration-unlimited-site-transfer-backup/`. That directory is protected with deny-all rules for Apache and IIS, carries an index file, and archive names include 32 random characters. Downloads are streamed through WordPress only after a capability and nonce check, so the folder never has to be publicly readable - which also keeps it safe on Nginx, where `.htaccess` files are ignored.
 
 = Does the plugin connect to any external service? =
 
@@ -126,7 +154,43 @@ They are not open to the public. Every one of them requires either a valid nonce
 
 = Does the plugin write anything outside its own folder? =
 
-Only backups, into `wp-content/uploads/owpm-backups/`. Nothing is written to the plugin directory, to `mu-plugins`, or anywhere else. Restoring an archive of course writes the files that archive contains, into `wp-content`.
+Only backups, into `wp-content/uploads/open-migration-unlimited-site-transfer-backup/`. Nothing is written to the plugin directory, to `mu-plugins`, or anywhere else. Restoring an archive of course writes the files that archive contains, into `wp-content`.
+
+= How big a site can this handle? =
+
+There is no fixed ceiling. Both the export and the import run in small batches, and each batch stops before the server's time limit and picks up where it left off. Multi-gigabyte sites work on ordinary shared hosting. The practical limit is disk space: the server needs room for the archive alongside the site itself, and the Export tab checks this before it starts.
+
+= Does it work on shared hosting? =
+
+Yes, and that is what it is designed for. It does not need shell access, WP-CLI, cron, or any raised PHP limit. If your host can run WordPress and has the ZipArchive extension, it works.
+
+= How long does a migration take? =
+
+Most small sites finish in a few minutes. Time scales with the number of files and the size of the database rather than with disk size alone, so a site with tens of thousands of small media files takes longer than a single large video. Progress is reported throughout, and closing the tab does not corrupt anything - the export or import resumes.
+
+= Can I use this to create a staging or test copy? =
+
+Yes. Export the live site and import it onto a second install at a different address. The URL conversion means the copy works immediately at its own address without any manual editing.
+
+= Can I move a site from localhost to a live server, or the other way round? =
+
+Yes, in both directions. Local addresses like `http://localhost/mysite` are handled the same as any other, including the port number if you use one.
+
+= Do I need to deactivate my other plugins first? =
+
+No. The archive contains your plugins as they were, and they come back in the same state on the destination.
+
+= What happens if an import fails partway through? =
+
+The destination is left with whatever had been restored up to that point, so start the import again rather than leaving it. The **Abort** button cleans up the working files and the session key. Because a failed import can leave a site in a half-restored state, take a backup of the destination first if it holds anything you care about.
+
+= Will my media library and page builder content survive? =
+
+Yes. Media files are copied as they are, and the URL conversion rewrites references inside serialised option values and JSON-escaped block markup, which is where page builders such as Elementor, Divi and WPBakery keep their data. A plain database search and replace corrupts serialised values; this does not.
+
+= Is it really free? =
+
+Yes. There is no paid tier, no feature held back, no upsell, and no size limit. It is GPLv2 open source.
 
 == Screenshots ==
 
@@ -137,6 +201,32 @@ Only backups, into `wp-content/uploads/owpm-backups/`. Nothing is written to the
 5. Managing existing backups.
 
 == Changelog ==
+
+= 1.3.12 =
+* Fixed: sites that relocate the uploads folder outside wp-content (via the UPLOADS constant or a custom upload path) produced a backup with no media in it. Uploads are now archived as a second root and restored to wherever the destination keeps them, so a move between two differently laid out installs works in both directions.
+* Changed: every path the plugin needs is now resolved through one small set of helpers in class-owpm-fs.php. Locations come from wp_upload_dir() and plugin_dir_path(); the content directory and site root are read in exactly one place each, with the reason documented there.
+
+= 1.3.11 =
+* Fixed: the text domain now matches the plugin slug, as the directory requires. All 262 translatable strings were updated.
+* Changed: the main plugin file and the backup folder are now named after the plugin slug as well, so every reference is consistent.
+
+= 1.3.10 =
+* Changed: the autoload value written during a restore now matches whatever the restored options table already uses. WordPress 6.6 replaced 'yes'/'no' in that column with 'on'/'off', and hardcoding either would eventually be wrong.
+
+= 1.3.9 =
+* Restored the Plugin URI header, now that the documentation site is published. It points at the plugin's own page and the Author URI points at the author's, which is the distinction the directory requires.
+
+= 1.3.8 =
+* Fixed: the server check assembled the uploads path from WP_CONTENT_DIR as a fallback, which is wrong on installs that move the uploads directory. It now resolves through wp_upload_dir() in every case.
+* Changed: backups are now stored in wp-content/uploads/open-migration-unlimited-site-transfer-backup/ rather than a separate folder name, matching the plugin slug.
+* Fixed: the Contributors line now names the WordPress.org account that owns the plugin.
+
+= 1.3.7 =
+* Fixed: the plugin and author URI headers held the same address. The directory requires them to differ, since one describes the plugin and the other the author. Only the author URI is declared now.
+
+= 1.3.6 =
+* Changed: the site-to-site token is now a plain, readable, delimited string instead of base64. It was only ever transport encoding, but the directory guidelines discourage anything resembling obfuscation, and a user should be able to read what they are pasting between two sites.
+* Changed: after the database restore the plugin now signs the operator straight back in and issues a fresh nonce, so the remaining import steps run fully authenticated. The one-time key is now only a fallback for archives that do not contain the operator's account.
 
 = 1.3.5 =
 * Added a documentation link to each tab, deep-linked to the section covering that tab, so help opens on the relevant part rather than the top of a long page.
@@ -208,6 +298,9 @@ Only backups, into `wp-content/uploads/owpm-backups/`. Nothing is written to the
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.3.12 =
+Fixes a bug that produced a backup with no media on sites that keep their uploads folder outside wp-content. Recommended for anyone on such a setup.
 
 = 1.3.0 =
 Adds a Change Domain tool with a DNS safety check, hardens how the import session key is stored, and fixes a memory problem when exporting sites with very large posts.

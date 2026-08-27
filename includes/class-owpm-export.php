@@ -40,7 +40,7 @@ class OWPM_Export {
 		check_ajax_referer( 'owpm_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration' ), 403 );
+			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
 		}
 
 		OWPM_FS::raise_limits();
@@ -53,7 +53,7 @@ class OWPM_Export {
 		$state = get_option( self::STATE_OPTION );
 
 		if ( ! is_array( $state ) || empty( $state['id'] ) || empty( $state['path'] ) || empty( $state['zip_file'] ) ) {
-			wp_send_json_error( __( 'No export is currently in progress. Please start a new export.', 'open-migration' ) );
+			wp_send_json_error( __( 'No export is currently in progress. Please start a new export.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		return $state;
@@ -67,11 +67,11 @@ class OWPM_Export {
 		$this->guard();
 
 		if ( is_multisite() ) {
-			wp_send_json_error( __( 'Multisite networks are not supported yet. Please export a single site install.', 'open-migration' ) );
+			wp_send_json_error( __( 'Multisite networks are not supported yet. Please export a single site install.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		if ( ! class_exists( 'ZipArchive' ) ) {
-			wp_send_json_error( __( 'The PHP ZipArchive extension is required but is not enabled on this server.', 'open-migration' ) );
+			wp_send_json_error( __( 'The PHP ZipArchive extension is required but is not enabled on this server.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		// Clear any half-finished export so we never mix two runs together.
@@ -88,13 +88,13 @@ class OWPM_Export {
 		$export_path = $this->temp_dir . $backup_id;
 
 		if ( ! wp_mkdir_p( $export_path ) ) {
-			wp_send_json_error( __( 'Could not create the backup working directory. Check permissions on wp-content/uploads.', 'open-migration' ) );
+			wp_send_json_error( __( 'Could not create the backup working directory. Check permissions on wp-content/uploads.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		$tables = OWPM_FS::get_site_tables();
 		if ( empty( $tables ) ) {
 			OWPM_FS::delete( $export_path );
-			wp_send_json_error( __( 'No database tables were found for this site.', 'open-migration' ) );
+			wp_send_json_error( __( 'No database tables were found for this site.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		$tables = $this->order_tables_for_restore( $tables );
@@ -105,7 +105,7 @@ class OWPM_Export {
 
 		if ( false === $total_files ) {
 			OWPM_FS::delete( $export_path );
-			wp_send_json_error( __( 'Could not read the wp-content directory.', 'open-migration' ) );
+			wp_send_json_error( __( 'Could not read the wp-content directory.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		update_option(
@@ -133,8 +133,8 @@ class OWPM_Export {
 
 		wp_send_json_success(
 			array(
-				'backup_id'   => $backup_id,
-				'total_files' => $total_files,
+				'backup_id'    => $backup_id,
+				'total_files'  => $total_files,
 				'total_tables' => count( $tables ),
 			)
 		);
@@ -226,35 +226,47 @@ class OWPM_Export {
 	}
 
 	/**
-	 * Write every exportable file path under wp-content to a manifest file.
+	 * Write every exportable file path to a manifest file.
+	 *
+	 * Normally that is everything under the content directory. When uploads have
+	 * been relocated outside it, they are walked as a second root -- otherwise the
+	 * backup would silently contain no media at all.
 	 *
 	 * @return int|false Number of files, or false on failure.
 	 */
 	private function build_manifest( $manifest_path ) {
-		$handle = @fopen( $manifest_path, 'wb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+		$handle = @fopen( $manifest_path, 'wb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen, WordPress.PHP.NoSilencedErrors.Discouraged
 		if ( ! $handle ) {
 			return false;
 		}
 
 		$count = 0;
+		$roots = array( OWPM_FS::content_dir() );
+
+		$external_uploads = OWPM_FS::external_uploads_dir();
+		if ( '' !== $external_uploads ) {
+			$roots[] = $external_uploads;
+		}
 
 		try {
-			$iterator = new RecursiveIteratorIterator(
-				new RecursiveCallbackFilterIterator(
-					new RecursiveDirectoryIterator( WP_CONTENT_DIR, RecursiveDirectoryIterator::SKIP_DOTS ),
-					array( $this, 'manifest_filter' )
-				),
-				RecursiveIteratorIterator::LEAVES_ONLY,
-				RecursiveIteratorIterator::CATCH_GET_CHILD
-			);
+			foreach ( $roots as $root ) {
+				$iterator = new RecursiveIteratorIterator(
+					new RecursiveCallbackFilterIterator(
+						new RecursiveDirectoryIterator( $root, RecursiveDirectoryIterator::SKIP_DOTS ),
+						array( $this, 'manifest_filter' )
+					),
+					RecursiveIteratorIterator::LEAVES_ONLY,
+					RecursiveIteratorIterator::CATCH_GET_CHILD
+				);
 
-			foreach ( $iterator as $file ) {
-				if ( ! $file->isFile() || $file->isLink() ) {
-					continue;
+				foreach ( $iterator as $file ) {
+					if ( ! $file->isFile() || $file->isLink() ) {
+						continue;
+					}
+
+					fwrite( $handle, $file->getPathname() . "\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
+					++$count;
 				}
-
-				fwrite( $handle, $file->getPathname() . "\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
-				$count++;
 			}
 		} catch ( Exception $e ) {
 			fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
@@ -278,13 +290,15 @@ class OWPM_Export {
 	public function manifest_filter( $current ) {
 		$path = str_replace( '\\', '/', $current->getPathname() );
 
+		$content = untrailingslashit( OWPM_FS::content_dir() );
+
 		$excluded = array(
 			rtrim( str_replace( '\\', '/', $this->temp_dir ), '/' ),
-			str_replace( '\\', '/', WP_CONTENT_DIR ) . '/cache',
-			str_replace( '\\', '/', WP_CONTENT_DIR ) . '/upgrade',
-			str_replace( '\\', '/', WP_CONTENT_DIR ) . '/upgrade-temp-backup',
-			str_replace( '\\', '/', WP_CONTENT_DIR ) . '/ai1wm-backups',
-			str_replace( '\\', '/', WP_CONTENT_DIR ) . '/updraft',
+			$content . '/cache',
+			$content . '/upgrade',
+			$content . '/upgrade-temp-backup',
+			$content . '/ai1wm-backups',
+			$content . '/updraft',
 		);
 
 		/**
@@ -325,14 +339,14 @@ class OWPM_Export {
 				array(
 					'status'   => 'complete',
 					'progress' => 100,
-					'current'  => __( 'Database export complete.', 'open-migration' ),
+					'current'  => __( 'Database export complete.', 'open-migration-unlimited-site-transfer-backup' ),
 				)
 			);
 		}
 
-		$handle = @fopen( $state['sql_file'], 'ab' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+		$handle = @fopen( $state['sql_file'], 'ab' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen, WordPress.PHP.NoSilencedErrors.Discouraged
 		if ( ! $handle ) {
-			wp_send_json_error( __( 'Could not write the database dump file.', 'open-migration' ) );
+			wp_send_json_error( __( 'Could not write the database dump file.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		$started   = microtime( true );
@@ -353,7 +367,7 @@ class OWPM_Export {
 			$current       = $table;
 
 			if ( ! $escaped_table ) {
-				$table_index++;
+				++$table_index;
 				$row_offset = 0;
 				continue;
 			}
@@ -366,7 +380,7 @@ class OWPM_Export {
 				$create = $wpdb->get_row( "SHOW CREATE TABLE {$escaped_table}", ARRAY_N );
 
 				if ( empty( $create[1] ) ) {
-					$table_index++;
+					++$table_index;
 					continue;
 				}
 
@@ -374,8 +388,8 @@ class OWPM_Export {
 				$this->write_statement( $handle, $create[1] );
 
 				// Resolve these once per table, not once per batch.
-				$state['db_order_by']  = OWPM_FS::order_by_clause( $escaped_table );
-				$state['db_where']     = $this->row_filter( $table );
+				$state['db_order_by']   = OWPM_FS::order_by_clause( $escaped_table );
+				$state['db_where']      = $this->row_filter( $table );
 				$state['db_rows_limit'] = $this->rows_per_batch( $table );
 			}
 
@@ -396,7 +410,7 @@ class OWPM_Export {
 			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 			if ( empty( $rows ) ) {
-				$table_index++;
+				++$table_index;
 				$row_offset = 0;
 			} else {
 				foreach ( $rows as $row ) {
@@ -415,7 +429,6 @@ class OWPM_Export {
 
 				$row_offset += count( $rows );
 			}
-
 		}
 
 		fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
@@ -431,7 +444,7 @@ class OWPM_Export {
 				array(
 					'status'   => 'complete',
 					'progress' => 100,
-					'current'  => __( 'Database export complete.', 'open-migration' ),
+					'current'  => __( 'Database export complete.', 'open-migration-unlimited-site-transfer-backup' ),
 				)
 			);
 		}
@@ -471,7 +484,7 @@ class OWPM_Export {
 		$flags    = $is_first ? ( ZipArchive::CREATE | ZipArchive::OVERWRITE ) : ZipArchive::CREATE;
 
 		if ( true !== $zip->open( $state['zip_file'], $flags ) ) {
-			wp_send_json_error( __( 'Could not open the backup archive for writing.', 'open-migration' ) );
+			wp_send_json_error( __( 'Could not open the backup archive for writing.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		if ( $is_first ) {
@@ -481,10 +494,10 @@ class OWPM_Export {
 			$zip->addFromString( 'metadata.json', wp_json_encode( $this->build_metadata( $state ) ) );
 		}
 
-		$handle = @fopen( $state['manifest'], 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+		$handle = @fopen( $state['manifest'], 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen, WordPress.PHP.NoSilencedErrors.Discouraged
 		if ( ! $handle ) {
 			$zip->close();
-			wp_send_json_error( __( 'The backup manifest is missing. Please start the export again.', 'open-migration' ) );
+			wp_send_json_error( __( 'The backup manifest is missing. Please start the export again.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		if ( $state['manifest_offset'] > 0 ) {
@@ -496,8 +509,12 @@ class OWPM_Export {
 		$batch_limit = 500;
 		$added       = 0;
 		$last_file   = '';
-		$content_dir = trailingslashit( str_replace( '\\', '/', WP_CONTENT_DIR ) );
-		$content_rel = basename( untrailingslashit( WP_CONTENT_DIR ) );
+		$content_dir = OWPM_FS::content_dir();
+		$content_rel = OWPM_FS::content_name();
+
+		// Empty on the usual layout, in which case the check below never matches
+		// and every file is stored relative to the content directory as before.
+		$uploads_dir = OWPM_FS::external_uploads_dir();
 
 		// $processed counts every manifest line consumed, not just files added to
 		// the zip. Files that vanished since the manifest was built still cost a
@@ -518,7 +535,7 @@ class OWPM_Export {
 				break;
 			}
 
-			$processed++;
+			++$processed;
 
 			$file_path = rtrim( $line, "\r\n" );
 
@@ -533,12 +550,21 @@ class OWPM_Export {
 				continue;
 			}
 
-			$relative   = str_replace( $content_dir, '', str_replace( '\\', '/', $file_path ) );
-			$local_name = $content_rel . '/' . ltrim( $relative, '/' );
+			$normalized = str_replace( '\\', '/', $file_path );
+
+			if ( '' !== $uploads_dir && 0 === strpos( $normalized, $uploads_dir ) ) {
+				// Relocated uploads: stored under a reserved folder so the importer
+				// can put them wherever the destination keeps its uploads.
+				$relative   = substr( $normalized, strlen( $uploads_dir ) );
+				$local_name = OWPM_FS::EXTERNAL_UPLOADS_ENTRY . '/' . ltrim( $relative, '/' );
+			} else {
+				$relative   = str_replace( $content_dir, '', $normalized );
+				$local_name = $content_rel . '/' . ltrim( $relative, '/' );
+			}
 
 			if ( $zip->addFile( $file_path, $local_name ) ) {
 				$last_file = $local_name;
-				$added++;
+				++$added;
 			} else {
 				$state['skipped_files'] = (int) $state['skipped_files'] + 1;
 			}
@@ -551,7 +577,7 @@ class OWPM_Export {
 		fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 
 		if ( true !== $zip->close() ) {
-			wp_send_json_error( __( 'Failed to write the backup archive. The server may be out of disk space.', 'open-migration' ) );
+			wp_send_json_error( __( 'Failed to write the backup archive. The server may be out of disk space.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		update_option( self::STATE_OPTION, $state, false );
@@ -564,7 +590,7 @@ class OWPM_Export {
 			array(
 				'status'       => $complete ? 'complete' : 'processing',
 				'progress'     => $complete ? 100 : $progress,
-				'current_file' => $complete ? __( 'Done', 'open-migration' ) : $last_file,
+				'current_file' => $complete ? __( 'Done', 'open-migration-unlimited-site-transfer-backup' ) : $last_file,
 				'files_done'   => (int) $state['files_done'],
 				'total_files'  => (int) $state['total_files'],
 				'added'        => $added,
@@ -584,8 +610,8 @@ class OWPM_Export {
 			'generated'    => gmdate( 'c' ),
 			'source_url'   => untrailingslashit( site_url() ),
 			'source_home'  => untrailingslashit( home_url() ),
-			'source_path'  => str_replace( '\\', '/', ABSPATH ),
-			'content_dir'  => basename( untrailingslashit( WP_CONTENT_DIR ) ),
+			'source_path'  => OWPM_FS::root_dir(),
+			'content_dir'  => OWPM_FS::content_name(),
 			'table_prefix' => $wpdb->prefix,
 			'charset'      => $wpdb->charset,
 			'collate'      => $wpdb->collate,
@@ -606,7 +632,7 @@ class OWPM_Export {
 		$state = $this->require_state();
 
 		if ( ! file_exists( $state['zip_file'] ) ) {
-			wp_send_json_error( __( 'The backup archive could not be found after packaging.', 'open-migration' ) );
+			wp_send_json_error( __( 'The backup archive could not be found after packaging.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		// Remove the working directory (SQL dump + manifest), keeping only the .zip.
@@ -679,20 +705,20 @@ class OWPM_Export {
 		$file = basename( $file );
 
 		if ( '' === $file || '.zip' !== strtolower( substr( $file, -4 ) ) ) {
-			wp_send_json_error( __( 'Invalid backup file name.', 'open-migration' ) );
+			wp_send_json_error( __( 'Invalid backup file name.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		$filepath = $this->temp_dir . $file;
 
 		if ( ! file_exists( $filepath ) || ! OWPM_FS::is_inside( $filepath, $this->temp_dir ) ) {
-			wp_send_json_error( __( 'Backup file not found.', 'open-migration' ) );
+			wp_send_json_error( __( 'Backup file not found.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
 		if ( ! OWPM_FS::delete( $filepath ) ) {
-			wp_send_json_error( __( 'Could not delete the backup file. Check file permissions.', 'open-migration' ) );
+			wp_send_json_error( __( 'Could not delete the backup file. Check file permissions.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
-		wp_send_json_success( __( 'Backup deleted.', 'open-migration' ) );
+		wp_send_json_success( __( 'Backup deleted.', 'open-migration-unlimited-site-transfer-backup' ) );
 	}
 
 	/* ---------------------------------------------------------------------
@@ -725,17 +751,17 @@ class OWPM_Export {
 		check_admin_referer( 'owpm_download_' . $file );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You do not have permission to download backups.', 'open-migration' ), 403 );
+			wp_die( esc_html__( 'You do not have permission to download backups.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
 		}
 
 		if ( '' === $file || '.zip' !== strtolower( substr( $file, -4 ) ) ) {
-			wp_die( esc_html__( 'Invalid backup file name.', 'open-migration' ), 400 );
+			wp_die( esc_html__( 'Invalid backup file name.', 'open-migration-unlimited-site-transfer-backup' ), 400 );
 		}
 
 		$path = $this->temp_dir . $file;
 
 		if ( ! file_exists( $path ) || ! OWPM_FS::is_inside( $path, $this->temp_dir ) ) {
-			wp_die( esc_html__( 'Backup file not found.', 'open-migration' ), 404 );
+			wp_die( esc_html__( 'Backup file not found.', 'open-migration-unlimited-site-transfer-backup' ), 404 );
 		}
 
 		OWPM_FS::raise_limits();
@@ -751,9 +777,9 @@ class OWPM_Export {
 			ob_end_clean();
 		}
 
-		$handle = @fopen( $path, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+		$handle = @fopen( $path, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen, WordPress.PHP.NoSilencedErrors.Discouraged
 		if ( ! $handle ) {
-			wp_die( esc_html__( 'Could not read the backup file.', 'open-migration' ), 500 );
+			wp_die( esc_html__( 'Could not read the backup file.', 'open-migration-unlimited-site-transfer-backup' ), 500 );
 		}
 
 		while ( ! feof( $handle ) ) {
