@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 1.3.12
+Stable tag: 1.3.13
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -54,7 +54,7 @@ Open Migration is built and maintained by [DiceCodes](https://dicecodes.com/). I
 
 == Installation ==
 
-1. In the WordPress admin, go to **Plugins - Add New**, search for **Open Migration**, and click **Install Now**. To install manually instead, upload the plugin folder to `/wp-content/plugins/open-migration-unlimited-site-transfer-backup/`.
+1. In the WordPress admin, go to **Plugins - Add New** and search for **Open Migration Unlimited Site Transfer** - search the full name, because "open migration" on its own returns the larger migration plugins first. Click **Install Now**. To install manually instead, upload the plugin folder to `/wp-content/plugins/open-migration-unlimited-site-transfer-backup/`.
 2. Click **Activate**.
 3. Open **Open Migration** in the admin menu.
 
@@ -201,6 +201,9 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 5. Managing existing backups.
 
 == Changelog ==
+
+= 1.3.13 =
+* Changed: the installation instructions now give the full plugin name to search for. Searching "open migration" alone returns the larger migration plugins first, so the previous wording sent people to a result they would not find.
 
 = 1.3.12 =
 * Fixed: sites that relocate the uploads folder outside wp-content (via the UPLOADS constant or a custom upload path) produced a backup with no media in it. Uploads are now archived as a second root and restored to wherever the destination keeps them, so a move between two differently laid out installs works in both directions.
