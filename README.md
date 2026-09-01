@@ -53,6 +53,13 @@ Your data never leaves your server. No cloud dependency, no tracking, no paid ti
       <br><i>Manage, download, or delete past backups.</i>
     </td>
   </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <br><b>Change Domain After DNS Is Switched</b><br><br>
+      <img src="assets/images/change-domain.png" width="620" alt="Change the site domain after DNS is pointed at the new server">
+      <br><i>Rewrite every reference to the old address in one pass — serialised data included.</i>
+    </td>
+  </tr>
 </table>
 
 ---
