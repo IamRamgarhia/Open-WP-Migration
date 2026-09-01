@@ -2,9 +2,9 @@
 Contributors: dicecodes
 Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.3.13
+Stable tag: 1.3.14
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -94,14 +94,41 @@ The destination fetches the archive straight from the source over the REST API a
 Run an export and keep the `.zip`. Restore it later on the same site or any other one - the **Backups** tab lists everything stored on the server, with download and delete buttons.
 
 == Frequently Asked Questions ==
-
 = Is there really no upload size limit? =
 
 The archive is sliced into small pieces in the browser and reassembled on the server, so your host's `upload_max_filesize` and `post_max_size` limits do not apply. The chunk size is chosen automatically from your server's own limits.
 
+= How big a site can this handle? =
+
+There is no fixed ceiling. Both the export and the import run in small batches, and each batch stops before the server's time limit and picks up where it left off. Multi-gigabyte sites work on ordinary shared hosting. The practical limit is disk space: the server needs room for the archive alongside the site itself, and the Export tab checks this before it starts.
+
+= Does it work on shared hosting? =
+
+Yes, and that is what it is designed for. It does not need shell access, WP-CLI, cron, or any raised PHP limit. If your host can run WordPress and has the ZipArchive extension, it works.
+
+= How long does a migration take? =
+
+Most small sites finish in a few minutes. Time scales with the number of files and the size of the database rather than with disk size alone, so a site with tens of thousands of small media files takes longer than a single large video. Progress is reported throughout, and closing the tab does not corrupt anything - the export or import resumes.
+
 = Do I need to change any URLs after importing? =
 
 No. The conversion runs automatically as part of the import and reports how many database rows it changed.
+
+= Will my media library and page builder content survive? =
+
+Yes. Media files are copied as they are, and the URL conversion rewrites references inside serialised option values and JSON-escaped block markup, which is where page builders such as Elementor, Divi and WPBakery keep their data. A plain database search and replace corrupts serialised values; this does not.
+
+= Can I import a site that used a different table prefix? =
+
+Yes. The prefix is recorded in the archive and converted during the restore, including the prefixed keys inside `options` and `usermeta`.
+
+= Can I move a site from localhost to a live server, or the other way round? =
+
+Yes, in both directions. Local addresses like `http://localhost/mysite` are handled the same as any other, including the port number if you use one.
+
+= Can I use this to create a staging or test copy? =
+
+Yes. Export the live site and import it onto a second install at a different address. The URL conversion means the copy works immediately at its own address without any manual editing.
 
 = Why am I logged out at the end of an import? =
 
@@ -117,9 +144,13 @@ Do it in that order. Changing the address before DNS resolves will leave the sit
 
 Yes. The **Change Domain** tab works at any time and is not tied to an import.
 
-= Can I import a site that used a different table prefix? =
+= What happens if an import fails partway through? =
 
-Yes. The prefix is recorded in the archive and converted during the restore, including the prefixed keys inside `options` and `usermeta`.
+The destination is left with whatever had been restored up to that point, so start the import again rather than leaving it. The **Abort** button cleans up the working files and the session key. Because a failed import can leave a site in a half-restored state, take a backup of the destination first if it holds anything you care about.
+
+= Do I need to deactivate my other plugins first? =
+
+No. The archive contains your plugins as they were, and they come back in the same state on the destination.
 
 = Does this work on multisite? =
 
@@ -137,61 +168,15 @@ In `wp-content/uploads/open-migration-unlimited-site-transfer-backup/`. That dir
 
 Only when you use the Site-to-Site tab, and only to the address you supply. Generating a token makes one request to your own site's REST API to confirm it is reachable. Pulling a site makes a request to the source site whose token you pasted. No data is sent to the plugin author or any third party, and no analytics or tracking of any kind is included.
 
-= Why are some AJAX actions registered for logged-out requests? =
+= How does the plugin keep my site safe? =
 
-Restoring a database replaces the destination's user accounts and session tokens. The moment that happens, the administrator running the import is no longer recognised as logged in - so the remaining steps of their own import would be rejected, leaving the site half-restored. Those steps are therefore reachable without a login cookie.
+Every administrative action checks a nonce and the `manage_options` capability. Archive entries are validated one by one before extraction, so a crafted `.zip` cannot write outside `wp-content`. Table names are validated before use and every value is bound through `$wpdb->prepare()`. Backups are streamed through WordPress after a permission check rather than being served as directly reachable files, and the address you enter in Change Domain is fully validated rather than silently corrected.
 
-They are not open to the public. Every one of them requires either a valid nonce plus the `manage_options` capability, or a 64-character random key that only exists while an import an administrator explicitly started is in progress. Only a SHA-256 hash of that key is stored on disk, it is compared with `hash_equals()`, it expires after six hours, and it is deleted as soon as the import finishes or is cancelled. The matching file identifier is required as well.
-
-= What else does the plugin do to keep things safe? =
-
-* Every administrative action checks a nonce and the `manage_options` capability.
-* Archive entries are validated one by one before extraction, so a crafted `.zip` cannot write outside `wp-content` (zip slip). Absolute paths, `..` segments and anything outside the expected folders are refused rather than sanitised.
-* Identifiers used to build file paths are reduced to `[A-Za-z0-9_-]`. `sanitize_text_field()` alone is not sufficient for this, because it leaves `../` intact.
-* Table names are validated against a strict pattern before being used in a query, and every value is bound through `$wpdb->prepare()`.
-* Backups are streamed through WordPress after a permission check rather than being served as directly reachable files.
-* The address entered in Change Domain is fully validated - scheme, hostname and path - instead of being silently corrected into something that merely looks valid.
-
-= Does the plugin write anything outside its own folder? =
-
-Only backups, into `wp-content/uploads/open-migration-unlimited-site-transfer-backup/`. Nothing is written to the plugin directory, to `mu-plugins`, or anywhere else. Restoring an archive of course writes the files that archive contains, into `wp-content`.
-
-= How big a site can this handle? =
-
-There is no fixed ceiling. Both the export and the import run in small batches, and each batch stops before the server's time limit and picks up where it left off. Multi-gigabyte sites work on ordinary shared hosting. The practical limit is disk space: the server needs room for the archive alongside the site itself, and the Export tab checks this before it starts.
-
-= Does it work on shared hosting? =
-
-Yes, and that is what it is designed for. It does not need shell access, WP-CLI, cron, or any raised PHP limit. If your host can run WordPress and has the ZipArchive extension, it works.
-
-= How long does a migration take? =
-
-Most small sites finish in a few minutes. Time scales with the number of files and the size of the database rather than with disk size alone, so a site with tens of thousands of small media files takes longer than a single large video. Progress is reported throughout, and closing the tab does not corrupt anything - the export or import resumes.
-
-= Can I use this to create a staging or test copy? =
-
-Yes. Export the live site and import it onto a second install at a different address. The URL conversion means the copy works immediately at its own address without any manual editing.
-
-= Can I move a site from localhost to a live server, or the other way round? =
-
-Yes, in both directions. Local addresses like `http://localhost/mysite` are handled the same as any other, including the port number if you use one.
-
-= Do I need to deactivate my other plugins first? =
-
-No. The archive contains your plugins as they were, and they come back in the same state on the destination.
-
-= What happens if an import fails partway through? =
-
-The destination is left with whatever had been restored up to that point, so start the import again rather than leaving it. The **Abort** button cleans up the working files and the session key. Because a failed import can leave a site in a half-restored state, take a backup of the destination first if it holds anything you care about.
-
-= Will my media library and page builder content survive? =
-
-Yes. Media files are copied as they are, and the URL conversion rewrites references inside serialised option values and JSON-escaped block markup, which is where page builders such as Elementor, Divi and WPBakery keep their data. A plain database search and replace corrupts serialised values; this does not.
+The only thing written outside `wp-content/uploads/open-migration-unlimited-site-transfer-backup/` is whatever an archive you chose to restore actually contains. Nothing is written to the plugin directory or to `mu-plugins`.
 
 = Is it really free? =
 
 Yes. There is no paid tier, no feature held back, no upsell, and no size limit. It is GPLv2 open source.
-
 == Screenshots ==
 
 1. Export tab with the server check and progress reporting.
@@ -201,6 +186,10 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 5. Managing existing backups.
 
 == Changelog ==
+
+= 1.3.14 =
+* Changed: FAQ tidied. Three entries written for the plugin review, including one about AJAX actions and logged-out requests, were confusing out of that context; two are merged into a single security answer and one is removed. The remaining questions are ordered by what people actually ask first.
+* Changed: tested against WordPress 7.1.
 
 = 1.3.13 =
 * Changed: the installation instructions now give the full plugin name to search for. Searching "open migration" alone returns the larger migration plugins first, so the previous wording sent people to a result they would not find.

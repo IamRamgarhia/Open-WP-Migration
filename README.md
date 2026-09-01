@@ -7,7 +7,7 @@
 [![WordPress.org](https://img.shields.io/wordpress/plugin/v/open-migration-unlimited-site-transfer-backup?logo=wordpress&label=WordPress.org)](https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/)
 [![License: GPLv2](https://img.shields.io/badge/License-GPLv2-green.svg)](readme.txt)
 [![WordPress](https://img.shields.io/badge/WordPress-Ready-blue.svg?logo=wordpress)](#quick-start--installation)
-[![Version](https://img.shields.io/badge/Version-1.3.13-orange.svg)](https://github.com/IamRamgarhia/Open-WP-Migration/releases)
+[![Version](https://img.shields.io/badge/Version-1.3.14-orange.svg)](https://github.com/IamRamgarhia/Open-WP-Migration/releases)
 [![PHP](https://img.shields.io/badge/PHP-7.2+-777BB4.svg?logo=php)](#quick-start--installation)
 [![GitHub Stars](https://img.shields.io/github/stars/IamRamgarhia/Open-WP-Migration?style=social)](https://github.com/IamRamgarhia/Open-WP-Migration)
 [![Cost](https://img.shields.io/badge/Cost-100%25%20Free-brightgreen.svg)](#why-choose-open-migration)
