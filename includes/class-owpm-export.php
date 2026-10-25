@@ -420,7 +420,15 @@ class OWPM_Export {
 							$values[] = 'NULL';
 						} else {
 							// esc_sql() escapes newlines, so each INSERT stays on one line.
-							$values[] = "'" . esc_sql( $value ) . "'";
+							//
+							// It also ends in wpdb::add_placeholder_escape(), which swaps
+							// every % for a per-process random token like {a1b2...}. wpdb
+							// strips that again on the way into a query, but we are writing
+							// to a file, so it would be baked into the dump -- and the
+							// importing process generates a different token, so it never
+							// matches and the literal {a1b2...} lands in the database in
+							// place of the %. Undo it here, while we still can.
+							$values[] = "'" . $wpdb->remove_placeholder_escape( esc_sql( $value ) ) . "'";
 						}
 					}
 
@@ -726,15 +734,19 @@ class OWPM_Export {
 	 * ------------------------------------------------------------------ */
 
 	private function download_url( $name ) {
-		return wp_nonce_url(
-			add_query_arg(
-				array(
-					'action' => 'owpm_download_backup',
-					'file'   => rawurlencode( $name ),
-				),
-				admin_url( 'admin-post.php' )
+		// The nonce is added by hand rather than with wp_nonce_url(), which runs its
+		// result through esc_html(). That is right for a URL printed into markup, but
+		// this one is handed to JavaScript as JSON and put in an href from there, so
+		// the &amp; entities survive into the request. PHP then splits the query
+		// string on the & inside them and sees "amp;_wpnonce" instead of "_wpnonce",
+		// and the download fails as an expired link.
+		return add_query_arg(
+			array(
+				'action'   => 'owpm_download_backup',
+				'file'     => rawurlencode( $name ),
+				'_wpnonce' => wp_create_nonce( 'owpm_download_' . $name ),
 			),
-			'owpm_download_' . $name
+			admin_url( 'admin-post.php' )
 		);
 	}
 

@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.3.14
+Stable tag: 1.3.15
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -187,6 +187,10 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 
 == Changelog ==
 
+= 1.3.15 =
+* Fixed: every percent sign in your content was replaced by a random token in curly braces after a migration. esc_sql() ends by swapping % for a placeholder that is unique to the running process, and that went into the dump file; the importing site generated a different placeholder, so it never matched and the token was written to the database. Reported by @giancarlozer0.
+* Fixed: the backup download link failed with "link expired" on some setups. The link was HTML-escaped before being handed to JavaScript, so PHP read the nonce as "amp;_wpnonce" and the check could not pass. Reported by @presswizards.
+
 = 1.3.14 =
 * Changed: FAQ tidied. Three entries written for the plugin review, including one about AJAX actions and logged-out requests, were confusing out of that context; two are merged into a single security answer and one is removed. The remaining questions are ordered by what people actually ask first.
 * Changed: tested against WordPress 7.1.
@@ -290,6 +294,9 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.3.15 =
+Fixes percent signs being replaced by a random token after a migration, and backup downloads failing as an expired link. Re-export any archive made with an earlier version.
 
 = 1.3.12 =
 Fixes a bug that produced a backup with no media on sites that keep their uploads folder outside wp-content. Recommended for anyone on such a setup.
