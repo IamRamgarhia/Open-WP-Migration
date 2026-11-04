@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.5.0
+Stable tag: 1.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -187,6 +187,10 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 
 == Changelog ==
 
+= 1.5.1 =
+* Security: fixed a flaw introduced in 1.5.0. While an import was running, every one of this site's tables was set aside at once, including the options table. With no options table WordPress concludes it is not installed and sends all visitors to the installer, where anyone at all could have claimed the site and made themselves an administrator — no password needed, for as long as the restore took. A minimal stand-in options table is now put in place immediately, so WordPress still sees an installed site and the installer stays shut. If you installed 1.5.0, update before running another import.
+* Fixed: a snapshot record left behind after the tables it describes are gone — someone restores a database by hand, for instance — no longer blocks every future snapshot or offer a rollback that cannot work. It is detected and cleared.
+
 = 1.5.0 =
 * Added: an import can now be undone. Before the database restore begins, this site's existing tables are set aside rather than overwritten — instantly, using no extra disk space. If the import fails, is cancelled, or dies mid-way, the Import tab offers to put the site back exactly as it was. A successful import clears the copy automatically.
 * Added: a plain-text recovery file is written to the backups folder when an import starts, for the case where the site is broken badly enough that the dashboard cannot be reached. It explains how to disable plugins over FTP, how to read the error log, and includes the exact SQL to restore this site's database by hand, with its real table names.
@@ -312,6 +316,9 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.5.1 =
+Security fix. 1.5.0 could expose the WordPress installer to anyone while an import was running. Update before importing again.
 
 = 1.5.0 =
 Adds a one-click undo for a failed import, an on-disk recovery guide, and a Verify tab for checking a site after a migration.

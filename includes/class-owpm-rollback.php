@@ -121,6 +121,19 @@ class OWPM_Rollback {
 			$renamed[] = $table;
 		}
 
+		// Critical. With every table parked, WordPress finds no options table,
+		// is_blog_installed() returns false, and wp_not_installed() redirects
+		// every visitor to wp-admin/install.php -- where anyone at all can set
+		// up a new site on this database and make themselves its administrator.
+		// That window would last for the whole database restore, minutes on a
+		// large site, and needs no credentials to walk through.
+		//
+		// A stand-in options table carrying siteurl is enough for
+		// is_blog_installed() to return true, so the installer stays shut. The
+		// dump drops and recreates this table like any other, and a rollback
+		// drops it before renaming the real one home.
+		self::create_installed_marker( $siteurl, $home );
+
 		self::write_state(
 			array(
 				'file_id' => (string) $file_id,
@@ -333,6 +346,72 @@ class OWPM_Rollback {
 	}
 
 	/**
+	 * Stand up a minimal options table so WordPress still sees an installed site.
+	 *
+	 * is_blog_installed() returns true as soon as it can read siteurl, and
+	 * wp_not_installed() only redirects to the installer when that is false. So
+	 * this table does not have to be complete or correct -- it has to exist and
+	 * answer that one question, for the few minutes between parking the real
+	 * tables and the dump recreating them.
+	 *
+	 * Mirrors core's options schema so the dump's own CREATE TABLE replaces it
+	 * without complaint. autoload uses 'yes', which every version reads,
+	 * including 6.6 and later that write 'on'.
+	 *
+	 * @param string $siteurl Address read before the rename.
+	 * @param string $home    Home address read before the rename.
+	 */
+	private static function create_installed_marker( $siteurl, $home ) {
+		global $wpdb;
+
+		$table = OWPM_FS::esc_table( $wpdb->options );
+
+		if ( ! $table ) {
+			return;
+		}
+
+		$charset = $wpdb->get_charset_collate();
+
+		// $table is a backticked identifier from esc_table() and $charset comes
+		// from wpdb itself. Neither can be bound as a placeholder -- prepare()
+		// binds values, not identifiers or charset clauses. Spans several lines,
+		// so disable/enable rather than a single-line ignore.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$wpdb->query(
+			"CREATE TABLE IF NOT EXISTS {$table} (
+				option_id bigint(20) unsigned NOT NULL auto_increment,
+				option_name varchar(191) NOT NULL default '',
+				option_value longtext NOT NULL,
+				autoload varchar(20) NOT NULL default 'yes',
+				PRIMARY KEY  (option_id),
+				UNIQUE KEY option_name (option_name)
+			) {$charset}"
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		foreach ( array(
+			'siteurl'  => $siteurl,
+			'home'     => $home,
+			'blogname' => __( 'Migration in progress', 'open-migration-unlimited-site-transfer-backup' ),
+		) as $name => $value ) {
+			if ( '' === $value ) {
+				continue;
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query(
+				$wpdb->prepare(
+					// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is a validated identifier.
+					"INSERT INTO {$table} (option_name, option_value, autoload) VALUES (%s, %s, 'yes')
+						ON DUPLICATE KEY UPDATE option_value = VALUES(option_value)",
+					$name,
+					$value
+				)
+			);
+		}
+	}
+
+	/**
 	 * Path of the snapshot record.
 	 */
 	private static function state_path() {
@@ -368,7 +447,42 @@ class OWPM_Rollback {
 
 		$state = json_decode( $raw, true );
 
-		return is_array( $state ) ? $state : false;
+		if ( ! is_array( $state ) || empty( $state['tables'] ) ) {
+			return false;
+		}
+
+		// The record can outlive what it describes: someone restores a database
+		// by hand, moves the site, or drops the parked tables in phpMyAdmin.
+		// Left alone it would block every future snapshot and offer a rollback
+		// that cannot work, so check the tables are really still there.
+		if ( ! self::parked_tables_exist( $state['tables'] ) ) {
+			self::clear_state();
+			return false;
+		}
+
+		return $state;
+	}
+
+	/**
+	 * Is at least one parked table still in the database?
+	 *
+	 * @param string[] $tables Live table names.
+	 */
+	private static function parked_tables_exist( $tables ) {
+		global $wpdb;
+
+		foreach ( $tables as $table ) {
+			$parked = self::PREFIX . $table;
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$found = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $parked ) ) );
+
+			if ( $found ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private static function clear_state() {
