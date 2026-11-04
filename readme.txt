@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.3.15
+Stable tag: 1.3.16
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -187,6 +187,9 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 
 == Changelog ==
 
+= 1.3.16 =
+* Fixed: an import could take the destination site down completely with "Cannot redeclare owpm_bootstrap()". If the source site had this plugin in a differently named folder, the archive's copy was restored alongside the running one and both declared the same function — a fatal on every request, wp-admin included, so the site could not be recovered from the dashboard. The archive's copy is now skipped whatever folder it was in, and the function is wrapped in function_exists() so a second copy can never cause a fatal. The existing guard did not cover this: PHP binds a top-level function at compile time, before the guard runs.
+
 = 1.3.15 =
 * Fixed: every percent sign in your content was replaced by a random token in curly braces after a migration. esc_sql() ends by swapping % for a placeholder that is unique to the running process, and that went into the dump file; the importing site generated a different placeholder, so it never matched and the token was written to the database. Reported by @giancarlozer0.
 * Fixed: the backup download link failed with "link expired" on some setups. The link was HTML-escaped before being handed to JavaScript, so PHP read the nonce as "amp;_wpnonce" and the check could not pass. Reported by @presswizards.
@@ -294,6 +297,9 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.3.16 =
+Important. Fixes an import that could leave the destination site showing a critical error on every page. Update before your next migration.
 
 = 1.3.15 =
 Fixes percent signs being replaced by a random token after a migration, and backup downloads failing as an expired link. Re-export any archive made with an earlier version.

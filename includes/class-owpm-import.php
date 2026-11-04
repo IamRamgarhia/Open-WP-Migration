@@ -573,6 +573,21 @@ class OWPM_Import {
 		// Never let the archive overwrite the running plugin or our own working
 		// files. The mu-plugins entry is legacy: versions before 1.2.0 created that
 		// loader, so archives made by them can still contain it.
+		// Never restore a second copy of this plugin. Matching only on the folder
+		// this copy happens to live in is not enough: the source site may have had
+		// it under a different name (hosts and installers add suffixes), and two
+		// copies in two folders both declare owpm_bootstrap(), which is a fatal
+		// redeclare on every request -- wp-admin included, so the site cannot be
+		// recovered from the dashboard.
+		if ( preg_match( '#^plugins/([^/]+)(/|$)#', $relative, $plugin_dir ) ) {
+			$folder = strtolower( $plugin_dir[1] );
+
+			if ( basename( untrailingslashit( OWPM_PLUGIN_DIR ) ) === $plugin_dir[1]
+				|| 0 === strpos( $folder, 'open-migration' ) ) {
+				return false;
+			}
+		}
+
 		$protected = array(
 			'plugins/' . basename( untrailingslashit( OWPM_PLUGIN_DIR ) ) . '/',
 			'uploads/' . OWPM_FS::BACKUP_DIR_NAME . '/',
