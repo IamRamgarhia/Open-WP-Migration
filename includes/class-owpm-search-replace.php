@@ -301,6 +301,93 @@ class OWPM_Search_Replace {
 	/**
 	 * Primary key columns and the columns worth searching, for one table.
 	 */
+	/**
+	 * Count what a replacement would touch, without touching it.
+	 *
+	 * A replace across every table cannot be undone, so the operator sees the
+	 * real numbers before it runs instead of a promise afterwards.
+	 *
+	 * The skipped list matters as much as the count. run_batch() passes over a
+	 * table with no primary key, because there is no safe way to address a row
+	 * in it -- so a site can come away from a "finished" replacement with
+	 * references still in place. Reporting success while leaving matches behind
+	 * is the same fail-open mistake as a check that reports clean when it could
+	 * not run.
+	 *
+	 * @param string[] $strings Needles. A row matching several is counted once.
+	 * @param string[] $tables  Tables to look at.
+	 *
+	 * @return array{rows:int,tables:string[],skipped:string[]}
+	 */
+	public static function preview( $strings, $tables ) {
+		global $wpdb;
+
+		$strings = array_values( array_filter( array_map( 'strval', (array) $strings ), 'strlen' ) );
+		$empty   = array(
+			'rows'    => 0,
+			'tables'  => array(),
+			'skipped' => array(),
+		);
+
+		if ( empty( $strings ) ) {
+			return $empty;
+		}
+
+		$rows    = 0;
+		$hit     = array();
+		$skipped = array();
+
+		foreach ( (array) $tables as $table ) {
+			$escaped = OWPM_FS::esc_table( $table );
+
+			if ( ! $escaped ) {
+				continue;
+			}
+
+			$schema = self::describe( $escaped );
+
+			if ( empty( $schema['searchable'] ) ) {
+				continue;
+			}
+
+			$where = array();
+			$args  = array();
+
+			foreach ( $schema['searchable'] as $column ) {
+				$col = '`' . str_replace( '`', '``', $column ) . '`';
+
+				foreach ( $strings as $needle ) {
+					$where[] = $col . ' LIKE %s';
+					$args[]  = '%' . $wpdb->esc_like( $needle ) . '%';
+				}
+			}
+
+			$sql = "SELECT COUNT(*) FROM {$escaped} WHERE " . implode( ' OR ', $where );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+			$found = (int) $wpdb->get_var( $wpdb->prepare( $sql, $args ) );
+
+			if ( $found < 1 ) {
+				continue;
+			}
+
+			// Matches here, but no primary key to target them with.
+			if ( empty( $schema['primary'] ) ) {
+				$skipped[] = (string) $table . ' (' . $found . ')';
+				continue;
+			}
+
+			$rows += $found;
+			$hit[] = (string) $table . ' (' . $found . ')';
+		}
+
+		return array(
+			'rows'    => $rows,
+			'tables'  => $hit,
+			'skipped' => $skipped,
+		);
+	}
+
 	private static function describe( $escaped_table ) {
 		$columns    = OWPM_FS::table_columns( $escaped_table );
 		$searchable = array();

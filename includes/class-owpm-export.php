@@ -23,6 +23,7 @@ class OWPM_Export {
 		$this->temp_dir = OWPM_FS::backup_dir();
 
 		add_action( 'wp_ajax_owpm_start_export', array( $this, 'ajax_start_export' ) );
+		add_action( 'wp_ajax_owpm_slim_preview', array( $this, 'ajax_slim_preview' ) );
 		add_action( 'wp_ajax_owpm_export_db', array( $this, 'ajax_export_db' ) );
 		add_action( 'wp_ajax_owpm_export_files', array( $this, 'ajax_export_files' ) );
 		add_action( 'wp_ajax_owpm_finish_export', array( $this, 'ajax_finish_export' ) );
@@ -63,6 +64,87 @@ class OWPM_Export {
 	 * Step 1: initialise
 	 * ------------------------------------------------------------------ */
 
+	/**
+	 * Say exactly what "slim down the backup" would leave out, before it runs.
+	 *
+	 * Read-only, and the number is counted rather than estimated. An operator
+	 * being asked to drop rows from their backup should see how many and from
+	 * where, not a reassuring adjective -- and a category that turns out to
+	 * account for nothing is worth knowing about too, because then there is no
+	 * reason to tick it.
+	 */
+	public function ajax_slim_preview() {
+		global $wpdb;
+
+		$this->guard();
+
+		$rows  = array();
+		$total = 0;
+		$bytes = 0;
+
+		foreach ( self::slim_categories() as $category ) {
+			$found = 0;
+
+			foreach ( OWPM_FS::get_site_tables() as $table ) {
+				$clauses = self::slim_clauses( $table, array( $category ) );
+
+				if ( empty( $clauses ) ) {
+					continue;
+				}
+
+				$escaped = OWPM_FS::esc_table( $table );
+
+				if ( ! $escaped ) {
+					continue;
+				}
+
+				// The clauses say what to keep, so what would be left out is
+				// everything that fails them.
+				$sql = "SELECT COUNT(*) FROM {$escaped} WHERE NOT ( " . implode( ' AND ', $clauses ) . ' )';
+
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+				$count = (int) $wpdb->get_var( $sql );
+
+				if ( $count < 1 ) {
+					continue;
+				}
+
+				$found += $count;
+				$bytes += $count * $this->average_row_bytes( $table );
+			}
+
+			$rows[ $category ] = $found;
+			$total            += $found;
+		}
+
+		wp_send_json_success(
+			array(
+				'categories' => $rows,
+				'rows'       => $total,
+				'size'       => $bytes > 0 ? size_format( $bytes ) : '',
+			)
+		);
+	}
+
+	/**
+	 * Rough bytes per row, for turning a row count into something meaningful.
+	 *
+	 * MySQL's own estimate. Approximate by nature, which is why it is only ever
+	 * shown next to an exact row count rather than on its own.
+	 */
+	private function average_row_bytes( $table ) {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$status = $wpdb->get_row( $wpdb->prepare( 'SHOW TABLE STATUS LIKE %s', $wpdb->esc_like( $table ) ), ARRAY_A );
+
+		if ( ! is_array( $status ) || empty( $status['Avg_row_length'] ) ) {
+			return 0;
+		}
+
+		return (int) $status['Avg_row_length'];
+	}
+
 	public function ajax_start_export() {
 		$this->guard();
 
@@ -90,6 +172,26 @@ class OWPM_Export {
 		if ( ! wp_mkdir_p( $export_path ) ) {
 			wp_send_json_error( __( 'Could not create the backup working directory. Check permissions on wp-content/uploads.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
+
+		// Categories the operator asked to leave out of the archive.
+		//
+		// wp_unslash() is not sanitising -- it only undoes WordPress's own
+		// slashes -- so the value is now run through sanitize_text_field() as
+		// well. What actually makes it safe to build SQL from is
+		// sanitize_slim(), which reduces it to keys slim_clauses() knows; this
+		// is the belt to that pair of braces, and it is what the static
+		// analysis was right to ask for.
+		//
+		// The field crosses the wire as a comma-separated string.
+		$raw_slim = '';
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by guard() at the top of this method.
+		if ( isset( $_POST['slim'] ) && is_string( $_POST['slim'] ) ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- as above.
+			$raw_slim = sanitize_text_field( wp_unslash( $_POST['slim'] ) );
+		}
+
+		$slim = self::sanitize_slim( $raw_slim );
 
 		$tables = OWPM_FS::get_site_tables();
 		if ( empty( $tables ) ) {
@@ -122,6 +224,7 @@ class OWPM_Export {
 				'db_order_by'     => '',
 				'db_where'        => '',
 				'db_rows_limit'   => 500,
+				'slim'            => $slim,
 				'manifest_offset' => 0,
 				'files_done'      => 0,
 				'total_files'     => $total_files,
@@ -185,14 +288,173 @@ class OWPM_Export {
 	 * restores the source site's stale cached data onto the destination, including
 	 * its update checks. The underscores are escaped so LIKE treats them literally.
 	 */
-	private function row_filter( $table ) {
+	private function row_filter( $table, $slim = array() ) {
 		global $wpdb;
 
-		if ( $table === $wpdb->prefix . 'options' ) {
+		if ( $table === $wpdb->options ) {
 			return " WHERE option_name NOT LIKE '\\_transient\\_%' AND option_name NOT LIKE '\\_site\\_transient\\_%'";
 		}
 
-		return '';
+		$clauses = self::slim_clauses( $table, $slim );
+
+		return empty( $clauses ) ? '' : ' WHERE ' . implode( ' AND ', $clauses );
+	}
+
+	/**
+	 * Categories a backup may leave out, and what each one means per table.
+	 *
+	 * Deliberately done here, at export, rather than by cleaning a site up.
+	 * That is the whole safety argument: this only decides what is *copied into
+	 * the archive*. The site being exported is read and never written, so an
+	 * operator who ticks the wrong box has a smaller backup, not a damaged
+	 * site -- and the untouched original is still there to export again.
+	 *
+	 * Every category is something WordPress or the plugin that made it builds
+	 * again by itself. Revisions start accumulating from the next edit,
+	 * transients from the next cache miss. Nothing here is content a visitor
+	 * can see.
+	 *
+	 * The clauses say what to KEEP, because that is what a dump's WHERE needs.
+	 * Identifiers come from $wpdb and the categories are whitelisted by
+	 * sanitize_slim(), so nothing here is interpolated from a request.
+	 *
+	 * @param string   $table Table being dumped.
+	 * @param string[] $slim  Category keys, already sanitised.
+	 * @return string[] SQL conditions, to be ANDed.
+	 */
+	private static function slim_clauses( $table, $slim ) {
+		global $wpdb;
+
+		$slim = (array) $slim;
+
+		if ( empty( $slim ) ) {
+			return array();
+		}
+
+		$want    = array_fill_keys( $slim, true );
+		$clauses = array();
+
+		// A row in a meta or relationship table is kept or dropped according to
+		// whether its parent survives. Dropping revisions from wp_posts but
+		// keeping their postmeta would leave the bloat behind under a different
+		// name, and orphaned meta that no longer means anything.
+		// Only these two child tables are touched, and only ever by their own
+		// parent's primary key.
+		//
+		// wp_term_relationships is deliberately left alone. Its object_id is not
+		// guaranteed to be a post: a plugin may attach a taxonomy to users or to
+		// its own object type, and those rows carry an id from a different
+		// sequence. Matching them against wp_posts would drop a legitimate row
+		// whenever the two sequences happened to collide. Revisions are never
+		// given term relationships by core anyway, so the gain was nil and the
+		// risk was not.
+		$children = array(
+			$wpdb->postmeta    => array( $wpdb->posts, 'post_id', 'ID', 'p' ),
+			$wpdb->commentmeta => array( $wpdb->comments, 'comment_id', 'comment_ID', 'c' ),
+		);
+
+		/**
+		 * "Keep this row unless its parent matches $condition."
+		 *
+		 * @param string $child     Child table name.
+		 * @param string $condition Condition on the parent alias.
+		 * @param bool   $negate    False asks for the opposite: keep only rows
+		 *                          whose parent exists at all.
+		 */
+		$parent_check = function ( $child, $condition, $negate = true ) use ( $children ) {
+			list( $parent, $child_key, $parent_key, $alias ) = $children[ $child ];
+
+			return ( $negate ? 'NOT EXISTS' : 'EXISTS' )
+				. ' ( SELECT 1 FROM `' . $parent . '` ' . $alias
+				. ' WHERE ' . $alias . '.`' . $parent_key . '` = `' . $child . '`.`' . $child_key . '`'
+				. ' AND ' . $condition . ' )';
+		};
+
+		if ( $table === $wpdb->posts ) {
+			if ( isset( $want['revisions'] ) ) {
+				$clauses[] = "post_type <> 'revision'";
+			}
+			if ( isset( $want['trashed'] ) ) {
+				// auto-draft is an abandoned "Add New Post": never published, never
+				// visible, and WordPress discards them itself after a week.
+				$clauses[] = "post_status NOT IN ( 'trash', 'auto-draft' )";
+			}
+		}
+
+		if ( $table === $wpdb->postmeta ) {
+			if ( isset( $want['revisions'] ) ) {
+				$clauses[] = $parent_check( $table, "p.post_type = 'revision'" );
+			}
+			if ( isset( $want['trashed'] ) ) {
+				$clauses[] = $parent_check( $table, "p.post_status IN ( 'trash', 'auto-draft' )" );
+			}
+			if ( isset( $want['orphans'] ) ) {
+				$clauses[] = $parent_check( $table, '1 = 1', false );
+			}
+		}
+
+		if ( $table === $wpdb->comments ) {
+			if ( isset( $want['spam'] ) ) {
+				$clauses[] = "comment_approved <> 'spam'";
+			}
+			if ( isset( $want['trashed'] ) ) {
+				$clauses[] = "comment_approved <> 'trash'";
+			}
+		}
+
+		if ( $table === $wpdb->commentmeta ) {
+			if ( isset( $want['spam'] ) ) {
+				$clauses[] = $parent_check( $table, "c.comment_approved = 'spam'" );
+			}
+			if ( isset( $want['trashed'] ) ) {
+				$clauses[] = $parent_check( $table, "c.comment_approved = 'trash'" );
+			}
+			if ( isset( $want['orphans'] ) ) {
+				$clauses[] = $parent_check( $table, '1 = 1', false );
+			}
+		}
+
+		return $clauses;
+	}
+
+	/**
+	 * Every category this plugin knows how to leave out.
+	 *
+	 * @return string[]
+	 */
+	public static function slim_categories() {
+		return array( 'revisions', 'trashed', 'spam', 'orphans' );
+	}
+
+	/**
+	 * Keep only categories this plugin actually implements.
+	 *
+	 * The whitelist is what makes slim_clauses() safe to build SQL from: an
+	 * unknown key never reaches it.
+	 *
+	 * @param mixed $raw Whatever arrived in the request.
+	 * @return string[]
+	 */
+	public static function sanitize_slim( $raw ) {
+		if ( is_string( $raw ) ) {
+			$raw = explode( ',', $raw );
+		}
+
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+
+		$clean = array();
+
+		foreach ( $raw as $key ) {
+			$key = strtolower( trim( (string) $key ) );
+
+			if ( in_array( $key, self::slim_categories(), true ) ) {
+				$clean[ $key ] = true;
+			}
+		}
+
+		return array_keys( $clean );
 	}
 
 	/**
@@ -389,7 +651,7 @@ class OWPM_Export {
 
 				// Resolve these once per table, not once per batch.
 				$state['db_order_by']   = OWPM_FS::order_by_clause( $escaped_table );
-				$state['db_where']      = $this->row_filter( $table );
+				$state['db_where']      = $this->row_filter( $table, isset( $state['slim'] ) ? (array) $state['slim'] : array() );
 				$state['db_rows_limit'] = $this->rows_per_batch( $table );
 			}
 

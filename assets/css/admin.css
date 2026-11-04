@@ -1088,6 +1088,16 @@ body.owpm-modal-open { overflow: hidden; }
 	color: #1d2327;
 }
 
+/*
+ * An author `display` beats the browser's own [hidden] { display: none }, so
+ * this warning was shown permanently -- including under "Keep them
+ * (recommended)", where it describes a risk the operator has not taken. It
+ * has to opt out of its own display rule.
+ */
+.owpm-mode-warning[hidden] {
+	display: none;
+}
+
 .owpm-mode-warning {
 	display: flex;
 	gap: 8px;
@@ -1159,3 +1169,371 @@ body.owpm-modal-open { overflow: hidden; }
 
 .owpm-check-fail { background: #fcf0f1; }
 .owpm-check-warn { background: #fcf9e8; }
+
+/* ---------------------------------------------------------------------------
+ * Foreign-host rows inside the Verify panel.
+ *
+ * `.owpm-check div` above sets every descendant div to a 2px column flex, so
+ * the two rows that need to read horizontally say so explicitly rather than
+ * relying on specificity order.
+ * ------------------------------------------------------------------------ */
+
+.owpm-hosts {
+	gap: 8px !important;
+	margin-top: 10px;
+	width: 100%;
+}
+
+.owpm-host {
+	gap: 6px !important;
+	padding: 10px 12px;
+	border: 1px solid #dcdcde;
+	border-left: 3px solid #2271b1;
+	border-radius: 3px;
+	background: #fff;
+}
+
+.owpm-host-main {
+	flex-direction: row !important;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 8px !important;
+}
+
+.owpm-host-main code {
+	font-size: 13px;
+	font-weight: 600;
+	padding: 2px 6px;
+	background: #f0f0f1;
+	word-break: break-all;
+}
+
+.owpm-check .owpm-host-count {
+	font-size: 12px;
+	color: #646970;
+}
+
+.owpm-host-pages {
+	margin: 0;
+	padding-left: 18px;
+	font-size: 12px;
+	list-style: disc;
+}
+
+.owpm-host-pages li {
+	margin: 0 0 2px;
+}
+
+.owpm-host-actions {
+	flex-direction: row !important;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px !important;
+}
+
+.owpm-check .owpm-host-status {
+	font-size: 12px;
+	color: #2271b1;
+}
+
+@media (max-width: 600px) {
+	.owpm-host-actions,
+	.owpm-host-main {
+		flex-direction: column !important;
+		align-items: flex-start;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+ * "Slim down the backup" — a closed accordion of optional exclusions.
+ *
+ * Collapsed by default: it is optional, and four checkboxes with a paragraph
+ * of explanation each is a wall of text in front of the button people came
+ * for. The summary carries a count so a choice made here is still visible
+ * once the panel is shut.
+ *
+ * Several rules are deliberately two classes deep. `.owpm-box label` sets
+ * display:block at (0,1,1) and these sit inside those coloured boxes on the
+ * Site-to-Site tab, where it put every checkbox on a line of its own.
+ * ------------------------------------------------------------------------ */
+
+.owpm-slim-accordion {
+	margin-top: 16px;
+}
+
+.owpm-slim-accordion > summary {
+	justify-content: flex-start;
+}
+
+.owpm-slim-chosen:empty {
+	display: none;
+}
+
+.owpm-slim-chosen {
+	margin-left: auto;
+	padding: 1px 8px;
+	border-radius: 10px;
+	background: #2271b1;
+	color: #fff;
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1.7;
+}
+
+.owpm-slim {
+	margin: 0;
+	padding: 4px 16px 14px;
+	border: 0;
+	border-top: 1px solid #f0f0f1;
+}
+
+.owpm-slim-lead {
+	margin: 10px 0 12px;
+	font-size: 12px;
+	line-height: 1.6;
+	color: #646970;
+	max-width: 70ch;
+}
+
+/* One row per option: control, then label over description. */
+.owpm-slim .owpm-slim-item {
+	display: grid;
+	grid-template-columns: 20px 1fr;
+	gap: 2px 10px;
+	align-items: start;
+	margin: 0;
+	padding: 9px 10px;
+	border-radius: 5px;
+	cursor: pointer;
+	transition: background .12s ease;
+}
+
+.owpm-slim .owpm-slim-item:hover {
+	background: #f6f7f7;
+}
+
+.owpm-slim .owpm-slim-item input[type="checkbox"] {
+	grid-column: 1;
+	grid-row: 1;
+	margin: 1px 0 0;
+	flex: none;
+}
+
+.owpm-slim .owpm-slim-item > span {
+	grid-column: 2;
+	grid-row: 1;
+	display: block;
+	font-size: 12px;
+	line-height: 1.55;
+	color: #646970;
+}
+
+.owpm-slim .owpm-slim-item strong {
+	display: block;
+	margin-bottom: 1px;
+	font-size: 13px;
+	font-weight: 600;
+	color: #1d2327;
+}
+
+/* Row count, filled in by the preview. */
+.owpm-slim-count {
+	display: inline-block;
+	font-style: normal;
+	font-size: 11px;
+	font-weight: 600;
+	color: #2271b1;
+}
+
+.owpm-slim-count:not(:empty) {
+	margin-top: 3px;
+	padding: 1px 7px;
+	border-radius: 9px;
+	background: #f0f6fc;
+}
+
+.owpm-slim-actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin: 12px 0 0;
+	padding-top: 12px;
+	border-top: 1px solid #f0f0f1;
+}
+
+.owpm-slim-summary {
+	font-size: 12px;
+	font-weight: 600;
+	color: #2271b1;
+}
+
+.owpm-slim-note {
+	margin: 10px 0 0;
+	font-size: 11px;
+	line-height: 1.6;
+	color: #787c82;
+	max-width: 70ch;
+}
+
+@media (max-width: 600px) {
+	.owpm-slim-actions {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+ * Foreign-host rows inside the Verify panel.
+ *
+ * `.owpm-check div` sets every descendant div to a 2px column flex, so the
+ * rows that need to read horizontally say so explicitly rather than relying
+ * on source order.
+ * ------------------------------------------------------------------------ */
+
+.owpm-hosts {
+	gap: 8px !important;
+	margin-top: 10px;
+	width: 100%;
+}
+
+.owpm-host {
+	gap: 6px !important;
+	padding: 10px 12px;
+	border: 1px solid #dcdcde;
+	border-left: 3px solid #2271b1;
+	border-radius: 4px;
+	background: #fff;
+}
+
+.owpm-host-main {
+	flex-direction: row !important;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 8px !important;
+}
+
+.owpm-host-main code {
+	font-size: 13px;
+	font-weight: 600;
+	padding: 2px 6px;
+	background: #f0f0f1;
+	word-break: break-all;
+}
+
+.owpm-check .owpm-host-count {
+	font-size: 12px;
+	color: #646970;
+}
+
+.owpm-host-pages {
+	margin: 0;
+	padding-left: 18px;
+	font-size: 12px;
+	list-style: disc;
+}
+
+.owpm-host-pages li {
+	margin: 0 0 2px;
+}
+
+.owpm-host-actions {
+	flex-direction: row !important;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px !important;
+}
+
+.owpm-check .owpm-host-status {
+	font-size: 12px;
+	color: #2271b1;
+}
+
+@media (max-width: 600px) {
+	.owpm-host-actions,
+	.owpm-host-main {
+		flex-direction: column !important;
+		align-items: flex-start;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+ * Keep/clean-install choice, when it appears inside a coloured box.
+ *
+ * `.owpm-box label` sets display:block at (0,1,1), which beat `.owpm-mode`
+ * at (0,1,0) and put the radio on a line of its own in the Site-to-Site pull
+ * step. Two classes deep to win, and laid out on a grid so the control, the
+ * heading and the explanation line up the same way as the slim-down options.
+ * ------------------------------------------------------------------------ */
+
+.owpm-modes .owpm-mode {
+	display: grid;
+	grid-template-columns: 20px 1fr;
+	gap: 2px 10px;
+	align-items: start;
+	margin: 0;
+	padding: 9px 10px;
+	border-radius: 5px;
+	cursor: pointer;
+	transition: background .12s ease;
+}
+
+.owpm-modes .owpm-mode:hover {
+	background: #f6f7f7;
+}
+
+.owpm-modes .owpm-mode input {
+	grid-column: 1;
+	grid-row: 1;
+	margin: 1px 0 0;
+}
+
+.owpm-modes .owpm-mode > span {
+	grid-column: 2;
+	grid-row: 1;
+	display: block;
+	font-size: 12px;
+	line-height: 1.55;
+	color: #646970;
+}
+
+.owpm-modes .owpm-mode strong {
+	display: block;
+	margin-bottom: 1px;
+	font-size: 13px;
+	font-weight: 600;
+	color: #1d2327;
+}
+
+/* A hover tint on a white card reads as a tint; on a coloured box it reads as
+   a smudge, so the rows get their own surface there instead. */
+.owpm-box .owpm-modes,
+.owpm-box .owpm-slim-accordion {
+	background: #fff;
+	border-radius: 6px;
+}
+
+.owpm-box .owpm-modes {
+	padding: 6px 10px 10px;
+	border: 1px solid #dcdcde;
+}
+
+/* ---------------------------------------------------------------------------
+ * The action button at the end of a coloured step box.
+ *
+ * These had no top margin, so each one sat flush against the accordion or
+ * fieldset above it and read as attached to it rather than as the thing the
+ * step is for.
+ * ------------------------------------------------------------------------ */
+
+.owpm-box > .owpm-btn {
+	margin-top: 14px;
+}
+
+@media (max-width: 600px) {
+	/* Thumb-sized, and not a 245px button wrapping mid-label. */
+	.owpm-box > .owpm-btn {
+		display: block;
+		width: 100%;
+	}
+}

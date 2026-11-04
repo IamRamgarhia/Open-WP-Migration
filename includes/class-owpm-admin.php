@@ -313,6 +313,27 @@ class OWPM_Admin {
 			'confirmDeleteTitle' => __( 'Delete this backup?', 'open-migration-unlimited-site-transfer-backup' ),
 			'confirmDeleteBtn'   => __( 'Delete backup', 'open-migration-unlimited-site-transfer-backup' ),
 			'compatTitle'        => __( 'Check before continuing', 'open-migration-unlimited-site-transfer-backup' ),
+			/* translators: %d: how many slim-down options are ticked. */
+			'slimChosen'         => __( '%d selected', 'open-migration-unlimited-site-transfer-backup' ),
+			'slimCounting'       => __( 'Counting…', 'open-migration-unlimited-site-transfer-backup' ),
+			/* translators: %d: number of database rows in this category. */
+			'slimRows'           => __( '%d row(s) here', 'open-migration-unlimited-site-transfer-backup' ),
+			'slimNone'           => __( 'nothing to leave out', 'open-migration-unlimited-site-transfer-backup' ),
+			/* translators: 1: number of rows, 2: approximate size in brackets, or empty. */
+			'slimTotal'          => __( '%1$d row(s) would be left out%2$s.', 'open-migration-unlimited-site-transfer-backup' ),
+			'slimClean'          => __( 'Nothing to leave out — this database is already tidy.', 'open-migration-unlimited-site-transfer-backup' ),
+			'blockedTitle'       => __( 'This import would break the site', 'open-migration-unlimited-site-transfer-backup' ),
+			'importBlocked'      => __( 'Import stopped. Nothing has been changed.', 'open-migration-unlimited-site-transfer-backup' ),
+			'confirmCleanTitle'  => __( 'Move themes and plugins aside, then overwrite?', 'open-migration-unlimited-site-transfer-backup' ),
+			'confirmClean'       => __( 'Clean install is selected. Every theme and plugin on this site is moved aside before the backup is restored, so the site comes up with only what the backup contains. They are kept as part of the restore point, not deleted — “Restore this site” puts them back. They are removed for good only once the import finishes successfully.', 'open-migration-unlimited-site-transfer-backup' ),
+			'confirmCleanBtn'    => __( 'Clean install and overwrite', 'open-migration-unlimited-site-transfer-backup' ),
+			'rollbackTitle'      => __( 'Put this site back?', 'open-migration-unlimited-site-transfer-backup' ),
+			'rollbackBody'       => __( 'Your original database will be restored, and any theme or plugin a clean install moved aside will be put back. Files the backup overwrote in place are not covered — those came from the archive and stay. This cannot be undone.', 'open-migration-unlimited-site-transfer-backup' ),
+			'rollbackBtn'        => __( 'Restore this site', 'open-migration-unlimited-site-transfer-backup' ),
+			'rollbackRunning'    => __( 'Restoring…', 'open-migration-unlimited-site-transfer-backup' ),
+			'discardTitle'       => __( 'Discard the saved copy?', 'open-migration-unlimited-site-transfer-backup' ),
+			'discardBody'        => __( 'The copy of your database from before the import will be deleted. You will no longer be able to roll back.', 'open-migration-unlimited-site-transfer-backup' ),
+			'discardBtn'         => __( 'Discard', 'open-migration-unlimited-site-transfer-backup' ),
 			'confirmDomain'      => __( 'This rewrites every reference across the whole database and cannot be undone. Continue?', 'open-migration-unlimited-site-transfer-backup' ),
 			'confirmDomainFrom'  => __( 'Change this site’s address?', 'open-migration-unlimited-site-transfer-backup' ),
 			'dnsChecking'        => __( 'Checking whether that address reaches this server…', 'open-migration-unlimited-site-transfer-backup' ),
@@ -322,7 +343,150 @@ class OWPM_Admin {
 			'domainRelogin'      => __( 'You are now signed out of this address. Open the new one and log in again, then re-save Settings → Permalinks.', 'open-migration-unlimited-site-transfer-backup' ),
 			'domainGoTo'         => __( 'Go to the new address', 'open-migration-unlimited-site-transfer-backup' ),
 			'rowsUpdated'        => __( 'database rows updated', 'open-migration-unlimited-site-transfer-backup' ),
+			'verifyRun'          => __( 'Run checks', 'open-migration-unlimited-site-transfer-backup' ),
+			'verifyRunning'      => __( 'Checking…', 'open-migration-unlimited-site-transfer-backup' ),
+			'hostLinks'          => __( 'link(s)', 'open-migration-unlimited-site-transfer-backup' ),
+			'hostFix'            => __( 'Point these at this site', 'open-migration-unlimited-site-transfer-backup' ),
+			'hostFixTitle'       => __( 'Rewrite links to this host?', 'open-migration-unlimited-site-transfer-backup' ),
+			'hostFixBtn'         => __( 'Rewrite links', 'open-migration-unlimited-site-transfer-backup' ),
+			'hostFixCounting'    => __( 'Counting what this would change…', 'open-migration-unlimited-site-transfer-backup' ),
+			/* translators: %s: the host name. Appears more than once. */
+			'hostFixKnown'       => __( 'This site is recorded as having been migrated from %s, so these are almost certainly links that should point here now.', 'open-migration-unlimited-site-transfer-backup' ),
+			/* translators: %s: the host name. Appears more than once. */
+			'hostFixUnknown'     => __( 'This site has no record of ever being at %s. If that is a site you link to on purpose, rewriting will turn every one of those links into a link to your own site.', 'open-migration-unlimited-site-transfer-backup' ),
+			/* translators: 1: number of database rows, 2: comma separated table names with counts. */
+			'hostFixCount'       => __( '%1$d database row(s) will change, across: %2$s.', 'open-migration-unlimited-site-transfer-backup' ),
+			/* translators: %s: comma separated table names with counts. */
+			'hostFixSkipped'     => __( 'These tables also contain it but cannot be rewritten automatically, because they have no primary key to address a row by: %s. You will need to edit those by hand.', 'open-migration-unlimited-site-transfer-backup' ),
+			'hostFixUndo'        => __( 'This cannot be undone. If you are not sure, take a backup from the Export tab first.', 'open-migration-unlimited-site-transfer-backup' ),
+			/* translators: %s: comma separated table names with counts. */
+			'hostFixLeft'        => __( 'Finished, but these still mention it and need a look by hand: %s', 'open-migration-unlimited-site-transfer-backup' ),
+			/* translators: %d: percentage complete. */
+			'hostFixWorking'     => __( 'Rewriting… %d%%', 'open-migration-unlimited-site-transfer-backup' ),
+			/* translators: %d: number of database rows changed. */
+			'hostFixDone'        => __( '%d row(s) updated.', 'open-migration-unlimited-site-transfer-backup' ),
 		);
+	}
+
+	/**
+	 * The "slim down the backup" options, for any tab that builds an archive.
+	 *
+	 * Rendered twice: on Export, and on the Site-to-Site tab where the old site
+	 * builds the archive the new one pulls. Both are exports, so both get the
+	 * choice.
+	 *
+	 * Factored out rather than duplicated because of what the single copy did:
+	 * Site-to-Site shares runExport(), so it was already honouring whatever was
+	 * ticked over on the Export tab -- an operator on this tab had their
+	 * archive quietly slimmed by boxes on a screen they were not looking at.
+	 * Controls that affect a run belong on the tab that starts it.
+	 *
+	 * @param string $scope Short identifier; scopes the fieldset for the script.
+	 */
+	private function slim_fieldset( $scope ) {
+		$options = array(
+			'revisions' => array(
+				__( 'Post revisions', 'open-migration-unlimited-site-transfer-backup' ),
+				__( 'Every saved draft of every edit, and their metadata. Often the largest single thing in a database. WordPress starts keeping new ones from your next edit.', 'open-migration-unlimited-site-transfer-backup' ),
+			),
+			'trashed'   => array(
+				__( 'Trashed and abandoned items', 'open-migration-unlimited-site-transfer-backup' ),
+				__( 'Posts and comments in the trash, and auto-drafts left behind by opening the editor without saving. WordPress deletes both itself after a while.', 'open-migration-unlimited-site-transfer-backup' ),
+			),
+			'spam'      => array(
+				__( 'Spam comments', 'open-migration-unlimited-site-transfer-backup' ),
+				__( 'Comments marked as spam, and their metadata.', 'open-migration-unlimited-site-transfer-backup' ),
+			),
+			'orphans'   => array(
+				__( 'Orphaned metadata', 'open-migration-unlimited-site-transfer-backup' ),
+				__( 'Rows left behind by posts and comments that no longer exist — usually from plugins removed long ago. Nothing can read them.', 'open-migration-unlimited-site-transfer-backup' ),
+			),
+		);
+		?>
+		<details class="owpm-accordion owpm-slim-accordion">
+			<summary>
+				<?php esc_html_e( 'Slim down the backup (optional)', 'open-migration-unlimited-site-transfer-backup' ); ?>
+				<?php
+				/*
+				 * A count in the summary, because the panel is closed by default
+				 * and a choice you cannot see is a choice you forget you made.
+				 * Filled in by the script whenever a box changes.
+				 */
+				?>
+				<span class="owpm-slim-chosen" data-scope="<?php echo esc_attr( $scope ); ?>"></span>
+			</summary>
+		<fieldset class="owpm-slim" data-scope="<?php echo esc_attr( $scope ); ?>">
+			<legend class="screen-reader-text"><?php esc_html_e( 'Slim down the backup (optional)', 'open-migration-unlimited-site-transfer-backup' ); ?></legend>
+			<p class="owpm-slim-lead">
+				<?php esc_html_e( 'Leave rebuildable clutter out of the archive, for a smaller file and a faster, tidier import. This only changes what gets copied — nothing on this site is altered or deleted, so you can export again at any time.', 'open-migration-unlimited-site-transfer-backup' ); ?>
+			</p>
+
+			<?php foreach ( $options as $key => $copy ) : ?>
+				<label class="owpm-slim-item">
+					<input type="checkbox" class="owpm-slim-box" value="<?php echo esc_attr( $key ); ?>" />
+					<span>
+						<strong><?php echo esc_html( $copy[0] ); ?></strong>
+						<?php echo esc_html( $copy[1] ); ?>
+						<em class="owpm-slim-count" data-slim-count="<?php echo esc_attr( $key ); ?>"></em>
+					</span>
+				</label>
+			<?php endforeach; ?>
+
+			<div class="owpm-slim-actions">
+				<button type="button" class="owpm-btn owpm-btn-secondary owpm-slim-preview">
+					<?php esc_html_e( 'Show me what this leaves out', 'open-migration-unlimited-site-transfer-backup' ); ?>
+				</button>
+				<span class="owpm-slim-summary" role="status"></span>
+			</div>
+
+			<p class="owpm-slim-note">
+				<?php esc_html_e( 'Transients — WordPress\'s own temporary cache — are always left out, whatever you choose here. Media files, uploads and settings are never affected by these options.', 'open-migration-unlimited-site-transfer-backup' ); ?>
+			</p>
+		</fieldset>
+		</details>
+		<?php
+	}
+
+	/**
+	 * What to do with themes and plugins already on the destination.
+	 *
+	 * Rendered on Import and on the Site-to-Site tab's pull step, which is an
+	 * import by another route and had no way to ask for a clean install.
+	 *
+	 * The radio group name carries the scope: two groups sharing a name would
+	 * behave as one, so choosing "clean install" here would silently clear the
+	 * other tab's choice.
+	 *
+	 * @param string $scope Short identifier, used in the radio group name.
+	 */
+	private function import_mode_fieldset( $scope ) {
+		$group = 'owpm_import_mode_' . $scope;
+		?>
+		<fieldset class="owpm-modes" data-scope="<?php echo esc_attr( $scope ); ?>">
+			<legend><?php esc_html_e( 'What to do with themes and plugins already here', 'open-migration-unlimited-site-transfer-backup' ); ?></legend>
+
+			<label class="owpm-mode">
+				<input type="radio" name="<?php echo esc_attr( $group ); ?>" value="keep" checked="checked" />
+				<span>
+					<strong><?php esc_html_e( 'Keep them (recommended)', 'open-migration-unlimited-site-transfer-backup' ); ?></strong>
+					<?php esc_html_e( 'The archive is restored over the top. Anything this site has that the backup does not is left in place, deactivated.', 'open-migration-unlimited-site-transfer-backup' ); ?>
+				</span>
+			</label>
+
+			<label class="owpm-mode">
+				<input type="radio" name="<?php echo esc_attr( $group ); ?>" value="clean" />
+				<span>
+					<strong><?php esc_html_e( 'Clean install', 'open-migration-unlimited-site-transfer-backup' ); ?></strong>
+					<?php esc_html_e( 'Move every theme and plugin on this site aside first, so it ends up matching the backup exactly. They are held as part of the restore point until the import succeeds, so this is reversible. Media files, uploads and must-use plugins are never touched.', 'open-migration-unlimited-site-transfer-backup' ); ?>
+				</span>
+			</label>
+
+			<p class="owpm-mode-warning" hidden>
+				<span class="dashicons dashicons-warning" aria-hidden="true"></span>
+				<?php esc_html_e( 'If the import then fails, this site has no themes or plugins until you either finish it or press “Restore this site”, which puts them back. They are deleted for good only once the import has finished successfully.', 'open-migration-unlimited-site-transfer-backup' ); ?>
+			</p>
+		</fieldset>
+		<?php
 	}
 
 	/**
@@ -491,6 +655,8 @@ class OWPM_Admin {
 							<div class="owpm-status-grid" id="owpm-status-grid"></div>
 						</div>
 
+						<?php $this->slim_fieldset( 'export' ); ?>
+
 						<div class="owpm-actions">
 							<button type="button" class="owpm-btn owpm-btn-primary" id="owpm-start-export">
 								<?php esc_html_e( 'Start Export', 'open-migration-unlimited-site-transfer-backup' ); ?>
@@ -561,14 +727,46 @@ class OWPM_Admin {
 									<strong><?php esc_html_e( 'An earlier import did not finish.', 'open-migration-unlimited-site-transfer-backup' ); ?></strong>
 									<p>
 										<?php
+										/*
+										 * Describes what is actually held, which is not always both.
+										 *
+										 * A clean install parks folders during extraction; the database
+										 * snapshot is not taken until the database phase begins. An import
+										 * that died in between leaves parked files and no tables, and this
+										 * paragraph then read "0 table(s), 56 years ago" -- a zero timestamp
+										 * measured by human_time_diff() from the epoch.
+										 */
+										$held = array();
+
+										if ( (int) $snapshot['tables'] > 0 ) {
+											$held[] = sprintf(
+												/* translators: %d: number of database tables held. */
+												_n( '%d database table', '%d database tables', (int) $snapshot['tables'], 'open-migration-unlimited-site-transfer-backup' ),
+												(int) $snapshot['tables']
+											);
+										}
+
+										if ( ! empty( $snapshot['files'] ) ) {
+											$held[] = sprintf(
+												/* translators: %d: number of theme or plugin folders held. */
+												_n( '%d theme or plugin folder', '%d theme and plugin folders', (int) $snapshot['files'], 'open-migration-unlimited-site-transfer-backup' ),
+												(int) $snapshot['files']
+											);
+										}
+
 										printf(
-											/* translators: 1: number of tables, 2: how long ago. */
-											esc_html__( 'This site\'s original database was set aside before that import started — %1$d table(s), %2$s ago — and it is still there. If this site is not right, you can put it back exactly as it was. If everything is fine, discard the copy to free the space.', 'open-migration-unlimited-site-transfer-backup' ),
-											(int) $snapshot['tables'],
-											esc_html( human_time_diff( $snapshot['taken'] ) )
+											/* translators: 1: what is held, 2: how long ago. */
+											esc_html__( 'A restore point from before that import is still here — %1$s, set aside %2$s ago. If this site is not right you can put it back; if everything is fine, discard it to free the space.', 'open-migration-unlimited-site-transfer-backup' ),
+											esc_html( implode( __( ' and ', 'open-migration-unlimited-site-transfer-backup' ), $held ) ),
+											esc_html( human_time_diff( (int) $snapshot['taken'] ) )
 										);
 										?>
 									</p>
+									<?php if ( (int) $snapshot['tables'] < 1 ) : ?>
+										<p>
+											<?php esc_html_e( 'That import stopped while it was still unpacking files, so it never reached the database — this site\'s own database was never touched and needs no restoring.', 'open-migration-unlimited-site-transfer-backup' ); ?>
+										</p>
+									<?php endif; ?>
 									<p>
 										<button type="button" class="owpm-btn owpm-btn-primary" id="owpm-do-rollback">
 											<?php esc_html_e( 'Restore this site', 'open-migration-unlimited-site-transfer-backup' ); ?>
@@ -607,30 +805,7 @@ class OWPM_Admin {
 							<input type="file" id="owpm-import-file" accept=".zip,application/zip" />
 						</div>
 
-						<fieldset class="owpm-modes">
-							<legend><?php esc_html_e( 'What to do with themes and plugins already here', 'open-migration-unlimited-site-transfer-backup' ); ?></legend>
-
-							<label class="owpm-mode">
-								<input type="radio" name="owpm_import_mode" value="keep" checked="checked" />
-								<span>
-									<strong><?php esc_html_e( 'Keep them (recommended)', 'open-migration-unlimited-site-transfer-backup' ); ?></strong>
-									<?php esc_html_e( 'The archive is restored over the top. Anything this site has that the backup does not is left in place, deactivated.', 'open-migration-unlimited-site-transfer-backup' ); ?>
-								</span>
-							</label>
-
-							<label class="owpm-mode">
-								<input type="radio" name="owpm_import_mode" value="clean" />
-								<span>
-									<strong><?php esc_html_e( 'Clean install', 'open-migration-unlimited-site-transfer-backup' ); ?></strong>
-									<?php esc_html_e( 'Delete every theme and plugin on this site first, so it ends up matching the backup exactly. Media files, uploads and must-use plugins are never deleted.', 'open-migration-unlimited-site-transfer-backup' ); ?>
-								</span>
-							</label>
-
-							<p class="owpm-mode-warning" id="owpm-clean-warning" hidden>
-								<span class="dashicons dashicons-warning" aria-hidden="true"></span>
-								<?php esc_html_e( 'Clean install deletes files that are not in your backup, and nothing can undo it. If the import then fails, this site has no themes or plugins until you finish it or restore your own backup. Only choose this if the backup is known good.', 'open-migration-unlimited-site-transfer-backup' ); ?>
-							</p>
-						</fieldset>
+						<?php $this->import_mode_fieldset( 'upload' ); ?>
 
 						<?php $this->progress_block( 'import' ); ?>
 
@@ -677,7 +852,19 @@ class OWPM_Admin {
 						<div class="owpm-box owpm-box-blue">
 							<h3><span class="owpm-step-n">1</span> <?php esc_html_e( 'On the OLD site — generate a token', 'open-migration-unlimited-site-transfer-backup' ); ?></h3>
 							<p><?php esc_html_e( 'This builds a full backup here, then gives you a one-time token that is valid for 24 hours.', 'open-migration-unlimited-site-transfer-backup' ); ?></p>
-							<button type="button" class="owpm-btn owpm-btn-secondary" id="owpm-generate-token">
+							<?php $this->slim_fieldset( 's2s' ); ?>
+
+							<?php
+							/*
+							 * Primary, like "Start Pull Transfer" below it. These are
+							 * the one action of their step and they run on different
+							 * machines -- the blue box on the old site, the orange on
+							 * the new -- so neither is subordinate to the other.
+							 * Outlining this one made the first half of the job look
+							 * like the optional half.
+							 */
+							?>
+							<button type="button" class="owpm-btn owpm-btn-primary" id="owpm-generate-token">
 								<?php esc_html_e( 'Build Backup &amp; Generate Token', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</button>
 							<?php $this->progress_block( 'token' ); ?>
@@ -689,6 +876,8 @@ class OWPM_Admin {
 							<p><?php esc_html_e( 'Paste the token from the old site. This server downloads the archive and restores it, replacing everything currently here.', 'open-migration-unlimited-site-transfer-backup' ); ?></p>
 							<label class="screen-reader-text" for="owpm-import-token"><?php esc_html_e( 'Migration token', 'open-migration-unlimited-site-transfer-backup' ); ?></label>
 							<input type="text" id="owpm-import-token" placeholder="<?php esc_attr_e( 'Paste migration token here…', 'open-migration-unlimited-site-transfer-backup' ); ?>" autocomplete="off" spellcheck="false" />
+							<?php $this->import_mode_fieldset( 'pull' ); ?>
+
 							<button type="button" class="owpm-btn owpm-btn-primary" id="owpm-start-pull">
 								<?php esc_html_e( 'Start Pull Transfer', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</button>
@@ -820,7 +1009,7 @@ class OWPM_Admin {
 							<h2><?php esc_html_e( 'Check this site after a migration', 'open-migration-unlimited-site-transfer-backup' ); ?></h2>
 							<?php $this->docs_link( 'after-import', __( 'Post-migration documentation', 'open-migration-unlimited-site-transfer-backup' ) ); ?>
 							<p class="owpm-lead">
-								<?php esc_html_e( 'A site that loads is not proof the migration finished cleanly. This looks for the things that go wrong quietly — references still pointing at the old address, settings corrupted by a find-and-replace, plugins marked active that are not installed. Nothing here changes anything.', 'open-migration-unlimited-site-transfer-backup' ); ?>
+								<?php esc_html_e( 'A site that loads is not proof the migration finished cleanly. This looks for the things that go wrong quietly — references still pointing at the old address, settings corrupted by a find-and-replace, plugins marked active that are not installed. The checks only read; nothing changes unless you press one of the buttons they offer.', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</p>
 						</div>
 

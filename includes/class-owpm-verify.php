@@ -23,8 +23,12 @@ class OWPM_Verify {
 	/** Rows to look at per table when counting stale references. */
 	const SCAN_LIMIT = 200000;
 
+	/** Example pages to name per foreign host, so the operator can look before rewriting. */
+	const SAMPLES_PER_HOST = 4;
+
 	public function __construct() {
 		add_action( 'wp_ajax_owpm_verify', array( $this, 'ajax_verify' ) );
+		add_action( 'wp_ajax_owpm_fix_links', array( $this, 'ajax_fix_links' ) );
 	}
 
 	public function ajax_verify() {
@@ -89,12 +93,15 @@ class OWPM_Verify {
 		return array_values( array_filter( $checks ) );
 	}
 
-	private function result( $label, $status, $detail, $count = 0 ) {
-		return array(
-			'label'  => $label,
-			'status' => $status,
-			'detail' => $detail,
-			'count'  => (int) $count,
+	private function result( $label, $status, $detail, $count = 0, $extra = array() ) {
+		return array_merge(
+			array(
+				'label'  => $label,
+				'status' => $status,
+				'detail' => $detail,
+				'count'  => (int) $count,
+			),
+			(array) $extra
 		);
 	}
 
@@ -229,24 +236,31 @@ class OWPM_Verify {
 	 * converted shows up immediately as a pile of links to its old address.
 	 * External links are normal, so this reports rather than warns, and the
 	 * operator recognises their own old domain at a glance.
+	 *
+	 * Each host is returned with a few of the pages it appears on, so the
+	 * operator can read the content before deciding to rewrite anything.
 	 */
 	private function check_foreign_domains() {
 		global $wpdb;
 
-		$self = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST );
+		$self = $this->self_hosts();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$rows = $wpdb->get_col(
-			"SELECT post_content FROM {$wpdb->posts}
+		$rows = $wpdb->get_results(
+			"SELECT ID, post_title, post_content FROM {$wpdb->posts}
 				WHERE post_status = 'publish'
 				AND post_content LIKE '%href=%'
-				LIMIT 2000"
+				LIMIT 2000",
+			ARRAY_A
 		);
 
-		$hosts  = array();
-		$broken = false;
+		$hosts   = array();
+		$samples = array();
+		$broken  = false;
 
-		foreach ( (array) $rows as $content ) {
+		foreach ( (array) $rows as $row ) {
+			$content = isset( $row['post_content'] ) ? $row['post_content'] : '';
+			$post_id = isset( $row['ID'] ) ? (int) $row['ID'] : 0;
 			// Tilde delimiter on purpose. The character class has to contain # so
 			// a match stops at a fragment, and with # as the delimiter too, PCRE
 			// ends the pattern there: preg_match_all() then returns false for
@@ -263,11 +277,22 @@ class OWPM_Verify {
 			foreach ( $matches[1] as $host ) {
 				$host = strtolower( $host );
 
-				if ( '' === $host || strtolower( (string) $self ) === $host ) {
+				if ( '' === $host || in_array( $host, $self, true ) ) {
 					continue;
 				}
 
 				$hosts[ $host ] = isset( $hosts[ $host ] ) ? $hosts[ $host ] + 1 : 1;
+
+				if ( ! isset( $samples[ $host ] ) ) {
+					$samples[ $host ] = array();
+				}
+
+				// Keyed by post ID so a page linking to the same host ten times is
+				// still named once.
+				if ( $post_id && ! isset( $samples[ $host ][ $post_id ] )
+					&& count( $samples[ $host ] ) < self::SAMPLES_PER_HOST ) {
+					$samples[ $host ][ $post_id ] = isset( $row['post_title'] ) ? (string) $row['post_title'] : '';
+				}
 			}
 		}
 
@@ -289,22 +314,306 @@ class OWPM_Verify {
 		}
 
 		arsort( $hosts );
-		$top  = array_slice( $hosts, 0, 5, true );
-		$list = array();
 
-		foreach ( $top as $host => $count ) {
-			$list[] = $host . ' (' . $count . ')';
+		$payload = array();
+
+		foreach ( array_slice( $hosts, 0, 20, true ) as $host => $count ) {
+			$pages = array();
+			$found = isset( $samples[ $host ] ) ? $samples[ $host ] : array();
+
+			foreach ( $found as $post_id => $title ) {
+				$pages[] = array(
+					'id'    => (int) $post_id,
+					'title' => ( '' !== trim( (string) $title ) )
+						? (string) $title
+						: sprintf(
+							/* translators: %d: post ID of an untitled page. */
+							__( 'Untitled (#%d)', 'open-migration-unlimited-site-transfer-backup' ),
+							(int) $post_id
+						),
+					'edit'  => (string) get_edit_post_link( (int) $post_id, 'raw' ),
+					'view'  => (string) get_permalink( (int) $post_id ),
+				);
+			}
+
+			$payload[] = array(
+				'host'  => (string) $host,
+				'count' => (int) $count,
+				'pages' => $pages,
+			);
 		}
 
 		return $this->result(
 			__( 'Links to other domains', 'open-migration-unlimited-site-transfer-backup' ),
 			'info',
-			sprintf(
-				/* translators: %s: list of host names with link counts. */
-				__( 'Your published content links to: %s. Links to other people\'s sites are perfectly normal — but if you recognise the site you migrated from in that list, those links still send your visitors there. Put the old address into the Change Domain tab to convert them.', 'open-migration-unlimited-site-transfer-backup' ),
-				implode( ', ', $list )
-			),
-			array_sum( $hosts )
+			__( 'Links to other people\'s sites are perfectly normal. What matters is whether you recognise the site you migrated from below — those links still walk your visitors back to it. Check the example pages first, then rewrite the ones that should point here.', 'open-migration-unlimited-site-transfer-backup' ),
+			array_sum( $hosts ),
+			array( 'hosts' => $payload )
+		);
+	}
+
+	/**
+	 * Point every reference to one host at this site instead.
+	 *
+	 * The Change Domain tab cannot do this, and the distinction matters. That
+	 * tab rewrites *from this site's own address* to a new one, which is the
+	 * right tool when the site is moving. It is no use for the case this
+	 * handles: the move already happened, siteurl is correct, and the content is
+	 * still full of absolute links to where the site used to live -- because the
+	 * import died before the replace pass ran, or the pages were written on the
+	 * old domain and brought over by hand. Until now the only advice this plugin
+	 * could offer for that was advice it could not carry out.
+	 *
+	 * Batched, because it walks every table once per replacement pair.
+	 */
+	public function ajax_fix_links() {
+		check_ajax_referer( 'owpm_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
+		}
+
+		OWPM_FS::raise_limits();
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by check_ajax_referer() above.
+		$host = isset( $_POST['host'] ) ? strtolower( sanitize_text_field( wp_unslash( $_POST['host'] ) ) ) : '';
+
+		if ( ! preg_match( '~^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$~', $host ) ) {
+			wp_send_json_error( __( 'That does not look like a host name.', 'open-migration-unlimited-site-transfer-backup' ) );
+		}
+
+		if ( in_array( $host, $this->self_hosts(), true ) ) {
+			wp_send_json_error( __( 'That is already this site’s address, so there is nothing to change.', 'open-migration-unlimited-site-transfer-backup' ) );
+		}
+
+		$pairs = $this->rewrite_pairs( $host );
+
+		if ( empty( $pairs ) ) {
+			wp_send_json_error( __( 'Nothing to replace for that host.', 'open-migration-unlimited-site-transfer-backup' ) );
+		}
+
+		$total = count( $pairs );
+
+		$needles = array();
+
+		foreach ( $pairs as $pair_values ) {
+			$needles[] = $pair_values[0];
+		}
+
+		// A dry run first, always. The operator confirms against the real number
+		// of rows this will change, not against an estimate, and a host that
+		// turns out to match nothing stops here instead of walking every table
+		// on the site to achieve nothing.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by check_ajax_referer() above.
+		if ( ! empty( $_POST['preview'] ) ) {
+			$found = OWPM_Search_Replace::preview( $needles, OWPM_FS::get_site_tables() );
+
+			if ( $found['rows'] < 1 && empty( $found['skipped'] ) ) {
+				wp_send_json_error(
+					sprintf(
+						/* translators: %s: host name. */
+						__( 'Nothing in the database mentions %s any more, so there is nothing to rewrite.', 'open-migration-unlimited-site-transfer-backup' ),
+						$host
+					)
+				);
+			}
+
+			wp_send_json_success(
+				array(
+					'rows'       => (int) $found['rows'],
+					'tables'     => $found['tables'],
+					'skipped'    => $found['skipped'],
+					'recognised' => $this->is_known_previous_host( $host ),
+					'host'       => $host,
+				)
+			);
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above. Clamped below.
+		$pair = isset( $_POST['pair'] ) ? max( 0, (int) $_POST['pair'] ) : 0;
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
+		$table = isset( $_POST['table'] ) ? max( 0, (int) $_POST['table'] ) : 0;
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
+		$offset = isset( $_POST['offset'] ) ? max( 0, (int) $_POST['offset'] ) : 0;
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
+		$rows = isset( $_POST['rows'] ) ? max( 0, (int) $_POST['rows'] ) : 0;
+
+		if ( $pair >= $total ) {
+			wp_send_json_success(
+				array(
+					'done' => true,
+					'rows' => $rows,
+				)
+			);
+		}
+
+		$tables  = OWPM_FS::get_site_tables();
+		$budget  = OWPM_FS::batch_time_budget();
+		$started = microtime( true );
+
+		$state = array(
+			'table_index' => $table,
+			'offset'      => $offset,
+			'rows'        => $rows,
+			'done'        => false,
+		);
+
+		while ( $pair < $total ) {
+			$left = $budget - ( microtime( true ) - $started );
+
+			if ( $left <= 0 ) {
+				break;
+			}
+
+			$state = OWPM_Search_Replace::run_batch( $pairs[ $pair ][0], $pairs[ $pair ][1], $tables, $state, $left );
+
+			if ( empty( $state['done'] ) ) {
+				// Yielded part way through this pair. Resume where it stopped.
+				break;
+			}
+
+			++$pair;
+
+			$state['table_index'] = 0;
+			$state['offset']      = 0;
+			$state['done']        = false;
+		}
+
+		$complete = ( $pair >= $total );
+		$left     = array();
+
+		if ( $complete ) {
+			// Rows were changed with direct SQL, so anything already cached is stale.
+			wp_cache_flush();
+
+			// Check the work rather than announce it. If anything still mentions
+			// the host -- a table with no primary key, a column type the replacer
+			// will not touch -- the operator is told, instead of being shown a
+			// tick over a site that is still half wrong.
+			$remaining = OWPM_Search_Replace::preview( $needles, OWPM_FS::get_site_tables() );
+
+			$left = array_values( array_merge( $remaining['tables'], $remaining['skipped'] ) );
+		}
+
+		wp_send_json_success(
+			array(
+				'done'      => $complete,
+				'pair'      => (int) $pair,
+				'pairs'     => $total,
+				'table'     => (int) $state['table_index'],
+				'offset'    => (int) $state['offset'],
+				'rows'      => (int) $state['rows'],
+				'remaining' => $left,
+				'progress'  => $total > 0 ? (int) round( ( $pair / $total ) * 100 ) : 100,
+			)
+		);
+	}
+
+	/**
+	 * This site's own authority, in every form a link may spell it.
+	 *
+	 * The href pattern captures host *and* port, because that is what appears
+	 * in a URL. wp_parse_url( ..., PHP_URL_HOST ) drops the port, so comparing
+	 * the two made a site served on a port -- localhost:8099, or any staging
+	 * install behind a non-standard one -- fail to recognise itself: it listed
+	 * its own domain as foreign and offered to rewrite its own links.
+	 *
+	 * @return string[] Lower-cased, host first.
+	 */
+	private function self_hosts() {
+		$site = (string) get_option( 'siteurl' );
+		$host = strtolower( (string) wp_parse_url( $site, PHP_URL_HOST ) );
+
+		if ( '' === $host ) {
+			return array();
+		}
+
+		$hosts = array( $host );
+		$port  = wp_parse_url( $site, PHP_URL_PORT );
+
+		if ( $port ) {
+			$hosts[] = $host . ':' . (int) $port;
+		}
+
+		return $hosts;
+	}
+
+	/**
+	 * Authority this site is served on, port included, for use as a
+	 * replacement target.
+	 */
+	private function self_authority() {
+		$hosts = $this->self_hosts();
+
+		// Last entry carries the port when there is one.
+		return empty( $hosts ) ? '' : (string) end( $hosts );
+	}
+
+	/**
+	 * Is this a host the site is recorded as having come from?
+	 *
+	 * Decides how loudly to warn. Rewriting the address a migration came from is
+	 * routine housekeeping. Rewriting a host this site has no recorded
+	 * relationship with is how someone turns every outbound link on their site
+	 * into a link to themselves, so that case gets the blunt warning rather than
+	 * the reassuring one.
+	 *
+	 * A false here means "not recorded", not "unsafe" -- an import that crashed
+	 * records nothing, which is exactly when this tool is needed most.
+	 */
+	private function is_known_previous_host( $host ) {
+		$record = get_option( 'owpm_last_import' );
+
+		if ( ! is_array( $record ) || empty( $record['source_url'] ) ) {
+			return false;
+		}
+
+		$source = strtolower( (string) wp_parse_url( (string) $record['source_url'], PHP_URL_HOST ) );
+
+		return ( '' !== $source && $source === $host );
+	}
+
+	/**
+	 * Every textual form a link to $host can take, mapped to this site.
+	 *
+	 * Both schemes, because content written on an http site and migrated to an
+	 * https one carries http links that no https-only pass would touch.
+	 */
+	private function rewrite_pairs( $host ) {
+		$site = untrailingslashit( (string) get_option( 'siteurl' ) );
+		// Port included. Without it a protocol-relative link on a site served on
+		// a port would be rewritten to the bare host and stop resolving.
+		$self = $this->self_authority();
+		$bare = '//' . $host;
+
+		$pairs = array();
+
+		foreach ( array( 'https://', 'http://' ) as $scheme ) {
+			foreach ( OWPM_Search_Replace::build_url_pairs( $scheme . $host, $site ) as $pair ) {
+				$pairs[ $pair[0] ] = $pair;
+			}
+		}
+
+		// build_url_pairs() includes the protocol-relative form, and keyed
+		// insertion puts it ahead of the http:// pair. Run it there and
+		// "http://old.example.com" is matched by "//old.example.com" first,
+		// leaving an http:// link on what may well be an https site. So it is
+		// pulled out and re-appended: scheme-qualified forms first, bare last.
+		unset( $pairs[ $bare ] );
+
+		if ( $self ) {
+			$pairs[ $bare ] = array( $bare, '//' . $self );
+		}
+
+		// A pair that replaces a string with itself would walk every table for
+		// nothing, and run_batch() treats it as already finished anyway.
+		return array_values(
+			array_filter(
+				$pairs,
+				static function ( $pair ) {
+					return '' !== $pair[0] && $pair[0] !== $pair[1];
+				}
+			)
 		);
 	}
 
@@ -556,15 +865,46 @@ class OWPM_Verify {
 			return null;
 		}
 
+		$files = isset( $snapshot['files'] ) ? (int) $snapshot['files'] : 0;
+
+		// Only mentions what is actually held. Announcing "0 database table(s)"
+		// for a restore point made entirely of parked files reads as a fault in
+		// the restore point rather than a description of it.
+		$held = array();
+
+		if ( (int) $snapshot['tables'] > 0 ) {
+			$held[] = sprintf(
+				/* translators: %d: number of database tables held. */
+				_n( '%d database table', '%d database tables', (int) $snapshot['tables'], 'open-migration-unlimited-site-transfer-backup' ),
+				(int) $snapshot['tables']
+			);
+		}
+
+		if ( $files > 0 ) {
+			$held[] = sprintf(
+				/* translators: %d: number of theme or plugin folders a clean install moved aside. */
+				_n( '%d theme or plugin folder moved aside by a clean install', '%d theme and plugin folders moved aside by a clean install', $files, 'open-migration-unlimited-site-transfer-backup' ),
+				$files
+			);
+		}
+
+		$detail = sprintf(
+			/* translators: %s: what the restore point holds. */
+			__( 'A restore point from before an import is still stored: %s.', 'open-migration-unlimited-site-transfer-backup' ),
+			implode( __( ' and ', 'open-migration-unlimited-site-transfer-backup' ), $held )
+		);
+
+		if ( (int) $snapshot['tables'] < 1 ) {
+			$detail .= ' ' . __( 'That import stopped while unpacking, so the database was never touched.', 'open-migration-unlimited-site-transfer-backup' );
+		}
+
+		$detail .= ' ' . __( 'Use "Restore this site" on the Import tab if this site is wrong, or discard it to free the space.', 'open-migration-unlimited-site-transfer-backup' );
+
 		return $this->result(
 			__( 'Unfinished import', 'open-migration-unlimited-site-transfer-backup' ),
 			'warn',
-			sprintf(
-				/* translators: %d: number of tables held in the snapshot. */
-				__( 'A snapshot of %d table(s) from before an import is still stored. Restore it from the Import tab if this site is wrong, or discard it to free the space.', 'open-migration-unlimited-site-transfer-backup' ),
-				$snapshot['tables']
-			),
-			$snapshot['tables']
+			$detail,
+			(int) $snapshot['tables'] + $files
 		);
 	}
 }

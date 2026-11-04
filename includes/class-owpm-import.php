@@ -370,6 +370,13 @@ class OWPM_Import {
 			'user_login'     => $current_user ? $current_user->user_login : '',
 		);
 
+		$blockers = $this->blocking_problems( $metadata, $session['zip_path'] );
+
+		// Recorded on the session so the steps that do the writing can refuse on
+		// their own account. A gate that lives only in the browser is a
+		// suggestion.
+		$session['blockers'] = $blockers;
+
 		if ( ! $this->write_session( $file_id, $session ) ) {
 			wp_send_json_error( __( 'Could not create the import session file. Check permissions on wp-content/uploads.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
@@ -381,10 +388,30 @@ class OWPM_Import {
 				'source_url'    => $session['old_url'],
 				'target_url'    => $session['new_url'],
 				'prefix_change' => ( $session['old_prefix'] && $session['old_prefix'] !== $session['new_prefix'] ),
+				'blockers'      => $blockers,
 				'notices'       => array_merge(
 					$this->compatibility_notices( $metadata ),
 					$this->capacity_notices( $session['zip_path'] )
 				),
+			)
+		);
+	}
+
+	/**
+	 * Stop a write step dead if preparation found a reason the site would break.
+	 *
+	 * Called at the top of every step that changes something.
+	 */
+	private function refuse_if_blocked( $session ) {
+		if ( empty( $session['blockers'] ) || ! is_array( $session['blockers'] ) ) {
+			return;
+		}
+
+		wp_send_json_error(
+			sprintf(
+				/* translators: %s: the reason the import cannot run. */
+				__( 'This import cannot run: %s', 'open-migration-unlimited-site-transfer-backup' ),
+				implode( ' ', array_map( 'strval', $session['blockers'] ) )
 			)
 		);
 	}
@@ -462,16 +489,113 @@ class OWPM_Import {
 		return $notices;
 	}
 
+	/**
+	 * Reasons to refuse the import outright.
+	 *
+	 * The difference between this and compatibility_notices() is whether
+	 * carrying on leaves a working site. A warning is for "this may need
+	 * attention afterwards". This list is for "proceeding produces a site that
+	 * is broken in a way the operator cannot easily undo", and for those,
+	 * stopping with an explanation beats a dialog that offers to continue
+	 * anyway -- because people click through those, and then the site is down.
+	 *
+	 * Enforced on the server, not just in the dialog: ajax_extract() and
+	 * ajax_db() re-check the session, so skipping the browser gate changes
+	 * nothing.
+	 *
+	 * @param array  $metadata Archive manifest.
+	 * @param string $zip_path Uploaded archive.
+	 * @return string[] Empty when the import may proceed.
+	 */
+	private function blocking_problems( $metadata, $zip_path ) {
+		$blockers = array();
+
+		// 1. A database from a newer WordPress onto older core.
+		//
+		// WordPress upgrades a database forward and never downgrades it. Restore a
+		// 6.8 database onto 6.2 core and the options table says db_version 57155
+		// while the files expect 53496: core sees nothing to do, and the site runs
+		// on a schema its own code does not know about. Comparing major.minor
+		// only, because 6.8.1 -> 6.8.0 shares a db_version and is harmless.
+		$source_wp = isset( $metadata['wp_version'] ) ? (string) $metadata['wp_version'] : '';
+		$target_wp = (string) get_bloginfo( 'version' );
+
+		if ( $source_wp && $target_wp
+			&& version_compare( $this->major_minor( $source_wp ), $this->major_minor( $target_wp ), '>' ) ) {
+			$blockers[] = sprintf(
+				/* translators: 1: source WordPress version, 2: this site's WordPress version. */
+				__( 'This backup is from WordPress %1$s and this site runs %2$s. WordPress can upgrade a database to a newer version but never back to an older one, so importing this would leave the site running on a database its own files do not understand. Update this site to %1$s or newer first (Dashboard → Updates), then import. The backup is unaffected and will still be here.', 'open-migration-unlimited-site-transfer-backup' ),
+				$source_wp,
+				$target_wp
+			);
+		}
+
+		// 2. A whole PHP major version backwards.
+		//
+		// Code written against PHP 8 uses syntax that PHP 7 cannot even parse --
+		// typed properties, union types, constructor promotion. A parse error is
+		// not catchable, so one such plugin takes down the front end and wp-admin
+		// together, leaving no way back in through the browser.
+		$source_php = isset( $metadata['php_version'] ) ? (string) $metadata['php_version'] : '';
+
+		if ( $source_php && (int) $source_php > (int) PHP_MAJOR_VERSION ) {
+			$blockers[] = sprintf(
+				/* translators: 1: source PHP version, 2: this server's PHP version, 3: source PHP major version. */
+				__( 'The source site ran PHP %1$s and this server runs PHP %2$s — a whole major version older. Themes and plugins written for PHP %3$s use syntax PHP %2$s cannot read at all, which takes down the front end and wp-admin together and leaves no way back in through the browser. Switch this server to PHP %3$s first: in your hosting control panel look for "PHP version", "Select PHP version", or "MultiPHP Manager" (cPanel), "PHP Configuration" (Plesk), or Advanced → PHP Configuration (hPanel). Pick %3$s, save, then reload this page and import.', 'open-migration-unlimited-site-transfer-backup' ),
+				$source_php,
+				PHP_VERSION,
+				(int) $source_php
+			);
+		}
+
+		// 3. Not enough room to unpack.
+		//
+		// Running out of disk part-way through extraction is the failure this
+		// plugin can least afford: files are half written, and the first symptom
+		// on a shared host is a site that no longer loads. capacity_notices()
+		// warns at twice the archive size, which is the comfortable margin. This
+		// refuses below the archive size itself, where failure is not a risk but
+		// an arithmetic certainty.
+		$archive = file_exists( $zip_path ) ? (int) filesize( $zip_path ) : 0;
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- unavailable on some hosts; guarded below.
+		$free = @disk_free_space( OWPM_FS::content_dir() );
+
+		if ( $archive > 0 && false !== $free && $free > 0 && $free < $archive ) {
+			$blockers[] = sprintf(
+				/* translators: 1: free disk space, 2: archive size. */
+				__( 'This server has only %1$s free and the backup needs at least %2$s to unpack. The import would stop part-way through with the files half written, which is how a site stops loading altogether. Free up space and try again — nothing has been changed.', 'open-migration-unlimited-site-transfer-backup' ),
+				size_format( $free ),
+				size_format( $archive )
+			);
+		}
+
+		return $blockers;
+	}
+
+	/**
+	 * "6.8.1" -> "6.8". Patch releases share a db_version, so comparing them
+	 * would block imports that are perfectly safe.
+	 */
+	private function major_minor( $version ) {
+		$parts = explode( '.', preg_replace( '/[^0-9.].*$/', '', (string) $version ) );
+
+		return (int) ( isset( $parts[0] ) ? $parts[0] : 0 ) . '.' . (int) ( isset( $parts[1] ) ? $parts[1] : 0 );
+	}
+
 	private function compatibility_notices( $metadata ) {
 		$notices = array();
 
 		$source_wp = isset( $metadata['wp_version'] ) ? (string) $metadata['wp_version'] : '';
 		$target_wp = get_bloginfo( 'version' );
 
-		if ( $source_wp && version_compare( $source_wp, $target_wp, '>' ) ) {
+		// A newer source is handled by blocking_problems(), which refuses rather
+		// than warns. What is left to mention here is the opposite direction: an
+		// archive from an older WordPress, which is safe but not silent.
+		if ( $source_wp && $target_wp
+			&& version_compare( (int) $source_wp . '', (int) $target_wp . '', '<' ) ) {
 			$notices[] = sprintf(
 				/* translators: 1: source WordPress version, 2: this site's WordPress version. */
-				__( 'This backup came from WordPress %1$s, but this site runs %2$s. Update this site to %1$s or newer before importing, otherwise the restored database will be newer than the WordPress files running it.', 'open-migration-unlimited-site-transfer-backup' ),
+				__( 'This backup is from WordPress %1$s and this site runs %2$s. That direction is fine — WordPress will upgrade the database after the import, and this plugin triggers that for you. Two things to expect afterwards: plugins abandoned since %1$s may not work on current PHP, and you should visit Settings → Permalinks once and press Save.', 'open-migration-unlimited-site-transfer-backup' ),
 				$source_wp,
 				$target_wp
 			);
@@ -479,10 +603,14 @@ class OWPM_Import {
 
 		$source_php = isset( $metadata['php_version'] ) ? (string) $metadata['php_version'] : '';
 
-		if ( $source_php && version_compare( $source_php, PHP_VERSION, '>' ) ) {
+		// A full major version backwards is refused by blocking_problems(). This
+		// is the same direction within one major -- 8.3 to 8.1, say -- where the
+		// code parses but a newer function may be missing at runtime.
+		if ( $source_php && version_compare( $source_php, PHP_VERSION, '>' )
+			&& (int) PHP_MAJOR_VERSION === (int) $source_php ) {
 			$notices[] = sprintf(
 				/* translators: 1: source PHP version, 2: this server's PHP version. */
-				__( 'The source site ran PHP %1$s and this server runs the older %2$s. Themes and plugins written for the newer version can fail here with a blank page. Most hosts let you switch PHP version from the control panel in a minute — doing that before you import is worth the trouble.', 'open-migration-unlimited-site-transfer-backup' ),
+				__( 'The source site ran PHP %1$s and this server runs the older %2$s. The code will load, but a theme or plugin calling something added after %2$s will fail at the moment it runs. To match the source: in your hosting control panel find "PHP version" / "Select PHP version" / "MultiPHP Manager" (cPanel), "PHP Configuration" (Plesk), or Advanced → PHP Configuration (hPanel), pick %1$s and save.', 'open-migration-unlimited-site-transfer-backup' ),
 				$source_php,
 				PHP_VERSION
 			);
@@ -501,7 +629,7 @@ class OWPM_Import {
 	}
 
 	/**
-	 * Remove themes and plugins the archive does not carry.
+	 * Move aside themes and plugins the archive does not carry.
 	 *
 	 * Without this an import leaves the destination holding the union of both
 	 * sites: every theme and plugin folder that was here before survives
@@ -511,9 +639,12 @@ class OWPM_Import {
 	 *
 	 * Deliberately limited to themes/ and plugins/. Uploads are left alone: the
 	 * destination's media may be referenced by something the archive does not
-	 * know about, and deleting it is not recoverable from a backup of the
-	 * *source*. mu-plugins is left alone because managed hosts put their own
-	 * code there and removing it breaks the platform, not the site.
+	 * know about, and a backup of the *source* cannot bring it back.
+	 * mu-plugins is left alone because managed hosts put their own code there
+	 * and removing it breaks the platform, not the site.
+	 *
+	 * Nothing here is deleted. Each folder is parked by OWPM_Rollback, which
+	 * makes this reversible until the import succeeds -- see park_file().
 	 *
 	 * Runs once, before extraction, so the archive then lands on a clean tree.
 	 *
@@ -579,7 +710,12 @@ class OWPM_Import {
 					continue;
 				}
 
-				if ( OWPM_FS::delete( $path ) ) {
+				// Parked, not deleted. A clean install used to destroy these
+				// outright, which meant the rollback snapshot covered the
+				// database and nothing else: restoring handed back options
+				// referring to plugins that no longer existed on disk. Moving
+				// the folder costs nothing and is exactly reversible.
+				if ( OWPM_Rollback::park_file( $path, $area ) ) {
 					++$removed;
 				}
 			}
@@ -746,6 +882,8 @@ class OWPM_Import {
 		if ( ! $session ) {
 			wp_send_json_error( __( 'The import session has expired. Please start again.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
+
+		$this->refuse_if_blocked( $session );
 
 		$zip = new ZipArchive();
 		if ( true !== $zip->open( $session['zip_path'] ) ) {
@@ -1012,6 +1150,8 @@ class OWPM_Import {
 		if ( ! $session ) {
 			wp_send_json_error( __( 'The import session has expired. Please start again.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
+
+		$this->refuse_if_blocked( $session );
 
 		$sql_file = trailingslashit( $session['work_dir'] ) . 'database.sql';
 
@@ -1722,14 +1862,56 @@ class OWPM_Import {
 
 		$result = OWPM_Rollback::restore();
 
+		// The snapshot is the database only -- RENAME TABLE is what makes it free
+		// and instant, and there is no equivalent for files. So the restored
+		// options can point at a plugin or theme that extraction overwrote or
+		// that a clean install deleted before the snapshot was even taken.
+		// Finalize has always run this; rollback did not, which left the one path
+		// that exists to rescue a broken site able to hand back a database
+		// referencing files that are no longer there.
+		$boot = $this->ensure_site_boots();
+
+		wp_cache_flush();
+
+		$message = sprintf(
+			/* translators: %d: number of database tables restored. */
+			_n( 'Your original database is back: %d table restored.', 'Your original database is back: %d tables restored.', $result['tables'], 'open-migration-unlimited-site-transfer-backup' ),
+			$result['tables']
+		);
+
+		// Said plainly rather than left for the operator to discover. "Put back
+		// as it was" was not true of the files, and a rollback that overstates
+		// what it recovered is how someone stops looking for the rest.
+		if ( ! empty( $result['files'] ) ) {
+			$message .= ' ' . sprintf(
+				/* translators: %d: number of theme or plugin folders moved back. */
+				_n( '%d theme or plugin folder has been put back.', '%d theme and plugin folders have been put back.', (int) $result['files'], 'open-migration-unlimited-site-transfer-backup' ),
+				(int) $result['files']
+			);
+		}
+
+		$message .= ' ' . __( 'Files the archive overwrote in place are not covered — those came from the backup and are still there.', 'open-migration-unlimited-site-transfer-backup' );
+
+		if ( ! empty( $boot['plugins_dropped'] ) ) {
+			$message .= ' ' . sprintf(
+				/* translators: %s: comma separated plugin files. */
+				__( 'These were active in the restored database but are no longer on disk, so they have been deactivated to keep the site loading: %s.', 'open-migration-unlimited-site-transfer-backup' ),
+				implode( ', ', $boot['plugins_dropped'] )
+			);
+		}
+
+		if ( ! empty( $boot['theme_switched'] ) ) {
+			$message .= ' ' . sprintf(
+				/* translators: %s: theme folder name now in use. */
+				__( 'The theme the restored database asked for is missing, so the site has been switched to %s.', 'open-migration-unlimited-site-transfer-backup' ),
+				$boot['theme_switched']
+			);
+		}
+
 		wp_send_json_success(
 			array(
 				'tables'  => $result['tables'],
-				'message' => sprintf(
-					/* translators: %d: number of database tables restored. */
-					_n( 'This site has been put back as it was, restoring %d table.', 'This site has been put back as it was, restoring %d tables.', $result['tables'], 'open-migration-unlimited-site-transfer-backup' ),
-					$result['tables']
-				),
+				'message' => $message,
 			)
 		);
 	}

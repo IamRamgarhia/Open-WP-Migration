@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.5.3
+Stable tag: 1.6.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -186,6 +186,35 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 5. Managing existing backups.
 
 == Changelog ==
+
+= 1.6.4 =
+* Fixed: the slim-down selection arriving from the browser was unslashed but never sanitised. It was already reduced to a fixed list of known keys before any SQL was built, so nothing could be injected through it, but the value is now run through sanitize_text_field() on the way in as well.
+* The ten warnings WordPress.org's Plugin Check reports are now zero. Nine were table and index names being written straight into statements that cannot take a bound parameter — prepare() binds values, not identifiers — where the names are validated and backticked first and never come from a request. Each now says so at the point it happens, rather than leaving a reader to work it out.
+
+= 1.6.3 =
+* Changed: "Build Backup & Generate Token" is now a solid button like "Start Pull Transfer". Both are the one action of their step and they run on different machines, so outlining the first made half the job look optional. Both also have room above them instead of sitting flush against the panel above, and go full width on a phone.
+
+= 1.6.2 =
+* Changed: the slim-down options are now a collapsed section rather than four checkboxes and a paragraph each sitting between you and the Export button. The summary shows how many are ticked, so a choice made there is still visible once it is shut.
+* Fixed: inside the coloured Site-to-Site boxes every checkbox and radio sat on a line of its own, because a rule for labels in those boxes overrode the one laying them out. The options and the keep/clean-install choice now read the same everywhere.
+* Fixed: the clean-install warning was shown permanently, including under "Keep them (recommended)" where it describes a risk you have not taken. An author style was overriding the browser's own handling of the hidden attribute.
+
+= 1.6.1 =
+* Fixed: while an import held the restore point, the dashboard redirected to upgrade.php and WordPress loaded no plugins at all — including this one. So the page carrying the "Restore this site" button could not be opened during the one window it exists for, and an import whose database dump needed more than one request had no handler left to continue with. The stand-in options table now also carries db_version and an active_plugins list holding only this plugin, so the dashboard loads and no third-party code runs against a half-restored database.
+* Fixed: a restore point made only of moved-aside files reported "0 database table(s), 56 years ago" on the Import tab and in the Verify check — a zero timestamp measured from the epoch. Both now describe what is actually held, and say that the database was never reached.
+
+= 1.6.0 =
+* Added: the Site-to-Site tab now carries the same options as the tabs it mirrors — the slim-down choices on the step that builds the archive, and the keep/clean-install choice on the step that restores it. Each tab's controls are its own: previously a site-to-site transfer silently used whatever was ticked over on the Export tab, which is not somewhere you would think to look.
+* Fixed: a site served on a non-standard port — localhost:8099, or staging behind one — listed its own domain as a foreign one in the Verify tab, because the port was compared against a host name with the port stripped. Pressing the rewrite button on it would then have removed the port from every protocol-relative link on the site.
+* Added: optional "Slim down the backup" on the Export tab — leave post revisions, trashed and abandoned items, spam comments and orphaned metadata out of the archive for a smaller file and a tidier import. It tells you how many rows each option would leave out before you start, counted rather than estimated. This only changes what gets copied: the site being exported is read and never written, so a box ticked by mistake gives you a smaller backup and nothing worse.
+* Added: the Verify tab now lists each other domain your content links to as its own row, with a few of the pages it appears on and a button that rewrites those links to point here. Before this the tab could only tell you the old address was still in your content; the advice it gave was to use the Change Domain tab, which rewrites *away from* this site's address and so could not fix it. The one thing it told you to do was the one thing that could not work.
+* Added: the rewrite counts what it would change and shows you the real number before it runs, names the tables it cannot fix automatically rather than reporting success over them, and re-checks the database afterwards instead of assuming it worked.
+* Added: an import is now refused, rather than warned about, when carrying on would break the site — a database from a newer WordPress than this site runs (WordPress upgrades a database but never downgrades one), a source PHP a whole major version ahead of this server, or less free disk than the archive needs to unpack. The refusal explains the remedy, including where to change PHP version in cPanel, Plesk and hPanel. It is enforced on the server, so skipping the dialog changes nothing.
+* Added: "Clean install" no longer deletes your themes and plugins. They are moved aside and held as part of the restore point, so "Restore this site" puts them back; they are removed for good only once the import has finished successfully. Previously they were deleted outright, which meant the snapshot covered the database alone and a rollback handed back settings naming plugins that no longer existed on disk.
+* Fixed: "Restore this site" now also puts the site into a state that can boot — anything the restored database points at that is no longer on disk is corrected, which only the end of a successful import used to do. It also says what it did and did not recover instead of claiming the site is "back as it was".
+* Fixed: a restore point made only of moved-aside files — left by an import that failed during extraction, before the database stage — was reported as nothing to restore, leaving those folders in a hidden directory with no way to bring them back.
+* Fixed: twelve dialog texts, including the clean-install confirmation and every rollback prompt, were hardcoded English that no translation could reach.
+* The recovery note left for a broken site now also says where moved-aside themes and plugins are and how to put them back by hand.
 
 = 1.5.3 =
 * Fixed: the "links to other domains" check added in 1.5.2 never worked. Its pattern used # as both the delimiter and a character inside the pattern, so it failed to compile and the check reported that every link was fine — on a site that had twelve links pointing at the domain it was migrated from. A check that fails open is worse than no check, so it now also says plainly when it cannot complete instead of reporting all clear.

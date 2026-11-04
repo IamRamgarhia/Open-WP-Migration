@@ -368,11 +368,17 @@
      * Both the Export tab and the Site-to-Site token flow use this, so a token can
      * never be issued before the archive is genuinely finished.
      */
-    function runExport(view) {
+    /**
+     * @param {object} view  Progress UI.
+     * @param {string} scope Which tab's slim-down boxes apply: 'export' or 's2s'.
+     *                       Passed in rather than looked up, because both tabs
+     *                       build an archive and each now has its own controls.
+     */
+    function runExport(view, scope) {
         view.show();
         view.set(2, 'Scanning site…');
 
-        return post('owpm_start_export', {}).then(function (start) {
+        return post('owpm_start_export', { slim: slimChoices(scope).join(',') }).then(function (start) {
             view.set(5, 'Exporting database…');
 
             return runUntilComplete('owpm_export_db', {}, function (data) {
@@ -396,6 +402,99 @@
         });
     }
 
+    /* -----------------------------------------------------------------
+     * Slim-down options: which rebuildable clutter to leave out.
+     * -------------------------------------------------------------- */
+
+    function slimFieldset(scope) {
+        return document.querySelector('.owpm-slim[data-scope="' + scope + '"]');
+    }
+
+    function slimChoices(scope) {
+        var box = slimFieldset(scope);
+
+        return box
+            ? [].slice.call(box.querySelectorAll('.owpm-slim-box:checked')).map(function (el) { return el.value; })
+            : [];
+    }
+
+    /**
+     * Keep the accordion summary honest about what is ticked inside it.
+     *
+     * The panel is closed by default, so without this a box ticked earlier is
+     * invisible at the moment the export starts -- the same hidden-state trap
+     * as options living on a different tab.
+     */
+    function refreshSlimBadge(box) {
+        var scope = box.getAttribute('data-scope');
+        var badge = document.querySelector('.owpm-slim-chosen[data-scope="' + scope + '"]');
+
+        if (!badge) {
+            return;
+        }
+
+        var n = box.querySelectorAll('.owpm-slim-box:checked').length;
+
+        badge.textContent = n > 0
+            ? (S.slimChosen || '%d selected').replace('%d', String(n))
+            : '';
+    }
+
+    document.addEventListener('change', function (event) {
+        var el = event.target;
+
+        if (el && el.classList && el.classList.contains('owpm-slim-box')) {
+            refreshSlimBadge(el.closest('.owpm-slim'));
+        }
+    });
+
+    /** 'keep' or 'clean', for the flow named by scope. */
+    function importMode(scope) {
+        var picked = document.querySelector('input[name="owpm_import_mode_' + scope + '"]:checked');
+
+        return picked ? picked.value : 'keep';
+    }
+
+    // Delegated, because this fieldset is rendered on more than one tab and each
+    // copy writes counts into its own labels.
+    document.addEventListener('click', function (event) {
+        var btn = event.target.closest ? event.target.closest('.owpm-slim-preview') : null;
+
+        if (!btn) {
+            return;
+        }
+
+        var box = btn.closest('.owpm-slim');
+        var summary = box.querySelector('.owpm-slim-summary');
+
+        btn.disabled = true;
+        summary.textContent = S.slimCounting || 'Counting\u2026';
+
+        // Counted, not estimated, and shown per category -- including the ones
+        // that come back as zero, because then there is no reason to tick them.
+        post('owpm_slim_preview', {}).then(function (data) {
+            var counts = (data && data.categories) || {};
+
+            [].slice.call(box.querySelectorAll('[data-slim-count]')).forEach(function (el) {
+                var n = counts[el.getAttribute('data-slim-count')] || 0;
+
+                el.textContent = n > 0
+                    ? (S.slimRows || '%d row(s) here').replace('%d', String(n))
+                    : (S.slimNone || 'nothing to leave out');
+            });
+
+            summary.textContent = (data.rows > 0)
+                ? (S.slimTotal || '%1$d row(s) would be left out%2$s.')
+                    .replace('%1$d', String(data.rows))
+                    .replace('%2$s', data.size ? ' (' + data.size + ')' : '')
+                : (S.slimClean || 'Nothing to leave out.');
+        }).catch(function (err) {
+            summary.textContent = err.message;
+        }).then(function () {
+            btn.disabled = false;
+        });
+    });
+
     var exportBtn = document.getElementById('owpm-start-export');
 
     if (exportBtn) {
@@ -405,7 +504,7 @@
             var view = ui('export');
             exportBtn.disabled = true;
 
-            runExport(view).then(function (result) {
+            runExport(view, 'export').then(function (result) {
                 view.done();
 
                 var warn = result.skipped_files > 0
@@ -447,8 +546,10 @@
      * @param {string} fileId Identifier of the uploaded/downloaded archive.
      * @param {object} view   Progress view.
      * @param {number} from   Progress percentage this stage starts at.
+     * @param {string} scope  Which flow's clean-install radio applies:
+     *                        'upload' or 'pull'. Each has its own fieldset.
      */
-    function runImportSteps(fileId, view, from) {
+    function runImportSteps(fileId, view, from, scope) {
         var span = 100 - from;
         var key = null;
 
@@ -456,14 +557,29 @@
 
         view.set(at(0.02), 'Inspecting backup…');
 
-        // Clean install deletes themes and plugins that are not in the backup, so
-        // it is only ever sent when the operator picked that radio themselves.
-        var modeEl = document.querySelector('input[name="owpm_import_mode"]:checked');
-        var cleanInstall = modeEl && modeEl.value === 'clean' ? '1' : '0';
+        // Clean install moves themes and plugins aside, so it is only ever sent
+        // when the operator picked that radio themselves -- in the flow they are
+        // actually using. Upload and site-to-site pull each have their own.
+        var cleanInstall = importMode(scope) === 'clean' ? '1' : '0';
 
         return post('owpm_import_prepare', { file_id: fileId, clean_install: cleanInstall }).then(function (prepared) {
             key = prepared.import_key;
             var payload = { file_id: fileId, import_key: prepared.import_key };
+
+            // Some mismatches are not a judgement call. Importing a newer
+            // WordPress database onto older core, or unpacking into less disk
+            // than the archive needs, produces a site the operator cannot easily
+            // put back — so there is no "continue anyway" offered for those, and
+            // the server refuses them independently of this dialog.
+            if (prepared.blockers && prepared.blockers.length) {
+                return dialog({
+                    title: S.blockedTitle || 'This import would break the site',
+                    body: prepared.blockers.join('\n\n'),
+                    alert: true
+                }).then(function () {
+                    throw new Error(S.importBlocked || 'Import stopped. Nothing has been changed.');
+                });
+            }
 
             // Environment mismatches are worth raising before anything is written.
             var gate = (prepared.notices && prepared.notices.length)
@@ -584,17 +700,21 @@
         triggerFileBtn.addEventListener('click', function () { fileInput.click(); });
     }
 
-    // Show the clean-install warning only while that option is actually selected.
-    var cleanWarning = document.getElementById('owpm-clean-warning');
-    var modeRadios = document.querySelectorAll('input[name="owpm_import_mode"]');
+    // Each fieldset shows its own warning, only while its own clean-install
+    // radio is the one selected.
+    [].slice.call(document.querySelectorAll('.owpm-modes')).forEach(function (modes) {
+        var warning = modes.querySelector('.owpm-mode-warning');
 
-    if (cleanWarning && modeRadios.length) {
-        Array.prototype.forEach.call(modeRadios, function (radio) {
+        if (!warning) {
+            return;
+        }
+
+        [].slice.call(modes.querySelectorAll('input[type="radio"]')).forEach(function (radio) {
             radio.addEventListener('change', function () {
-                cleanWarning.hidden = this.value !== 'clean';
+                warning.hidden = this.value !== 'clean';
             });
         });
-    }
+    });
 
     if (fileInput) {
         fileInput.addEventListener('change', function (e) {
@@ -640,8 +760,7 @@
             return;
         }
 
-        var mode = document.querySelector('input[name="owpm_import_mode"]:checked');
-        var isClean = mode && mode.value === 'clean';
+        var isClean = importMode('upload') === 'clean';
 
         // Clean install deletes files no backup of the source can bring back, so
         // it gets its own confirmation rather than riding on the general one.
@@ -719,7 +838,7 @@
                 if (next < totalChunks) {
                     uploadChunk(next);
                 } else {
-                    runImportSteps(fileId, view, 40)
+                    runImportSteps(fileId, view, 40, 'upload')
                         .then(function (result) { renderImportResult(view, result); })
                         .catch(function (err) { view.fail(err.message); });
                 }
@@ -747,7 +866,7 @@
 
             // The export must fully complete first, otherwise the destination
             // could pull a partially written archive.
-            runExport(view).then(function (finished) {
+            runExport(view, 's2s').then(function (finished) {
                 view.set(99, 'Generating token…');
                 return post('owpm_generate_token', { backup_id: finished.backup_id });
             }).then(function (data) {
@@ -819,7 +938,7 @@
 
             return post('owpm_pull_site', { token: token }).then(function (data) {
                 view.set(35, 'Downloaded ' + data.size + '. Restoring…');
-                return runImportSteps(data.file_id, view, 35);
+                return runImportSteps(data.file_id, view, 35, 'pull');
             }).then(function (result) {
                 renderImportResult(view, result);
             }).catch(function (err) {
@@ -1087,24 +1206,214 @@
             verifyBtn.textContent = S.verifyRunning || 'Checking…';
             verifyOut.innerHTML = '';
 
-            post('owpm_verify', {}).then(function (data) {
-                var rows = (data && data.checks) || [];
-                var html = '<ul class="owpm-checks">';
+            runVerify();
+        });
+    }
 
-                rows.forEach(function (c) {
-                    html += '<li class="owpm-check owpm-check-' + esc(c.status) + '">' +
-                        '<span class="owpm-check-dot" aria-hidden="true"></span>' +
-                        '<div><strong>' + esc(c.label) + '</strong>' +
-                        '<span>' + esc(c.detail) + '</span></div></li>';
+    /**
+     * One row per foreign host: how many links, where to look, and a way to
+     * rewrite them.
+     *
+     * The count alone was not actionable. Reading "d.dicecodes.com (197)" tells
+     * you something is wrong but not whether those links are in a page you care
+     * about, and the only instruction the plugin could give was to use Change
+     * Domain -- which rewrites *away from* this site's address and so cannot
+     * touch them. Hence the example pages (look before you leap) and the button
+     * (the thing that actually fixes it).
+     */
+    function renderHosts(hosts) {
+        var html = '<div class="owpm-hosts">';
+
+        hosts.forEach(function (h) {
+            var pages = (h.pages || []).map(function (p) {
+                var label = esc(p.title);
+
+                return p.edit
+                    ? '<li><a href="' + esc(p.edit) + '">' + label + '</a></li>'
+                    : '<li>' + label + '</li>';
+            }).join('');
+
+            html += '<div class="owpm-host" data-host="' + esc(h.host) + '">' +
+                '<div class="owpm-host-main">' +
+                '<code>' + esc(h.host) + '</code>' +
+                '<span class="owpm-host-count">' +
+                esc(String(h.count)) + ' ' + esc(S.hostLinks || 'link(s)') + '</span>' +
+                '</div>' +
+                (pages ? '<ul class="owpm-host-pages">' + pages + '</ul>' : '') +
+                '<div class="owpm-host-actions">' +
+                '<button type="button" class="owpm-btn owpm-btn-secondary owpm-fix-host">' +
+                esc(S.hostFix || 'Point these at this site') + '</button>' +
+                '<span class="owpm-host-status" role="status"></span>' +
+                '</div></div>';
+        });
+
+        return html + '</div>';
+    }
+
+    function runVerify() {
+        if (!verifyBtn || !verifyOut) {
+            return Promise.resolve();
+        }
+
+        verifyBtn.disabled = true;
+        verifyBtn.textContent = S.verifyRunning || 'Checking…';
+        verifyOut.innerHTML = '';
+
+        return post('owpm_verify', {}).then(function (data) {
+            var rows = (data && data.checks) || [];
+            var html = '<ul class="owpm-checks">';
+
+            rows.forEach(function (c) {
+                html += '<li class="owpm-check owpm-check-' + esc(c.status) + '">' +
+                    '<span class="owpm-check-dot" aria-hidden="true"></span>' +
+                    '<div><strong>' + esc(c.label) + '</strong>' +
+                    '<span>' + esc(c.detail) + '</span>' +
+                    ((c.hosts && c.hosts.length) ? renderHosts(c.hosts) : '') +
+                    '</div></li>';
+            });
+
+            verifyOut.innerHTML = html + '</ul>';
+        }).catch(function (err) {
+            verifyOut.innerHTML = '<p class="owpm-error">' + esc(err.message) + '</p>';
+        }).then(function () {
+            verifyBtn.disabled = false;
+            verifyBtn.textContent = S.verifyRun || 'Run checks';
+        });
+    }
+
+    if (verifyOut) {
+        verifyOut.addEventListener('click', function (event) {
+            var btn = event.target.closest('.owpm-fix-host');
+
+            if (!btn) {
+                return;
+            }
+
+            var row = btn.closest('.owpm-host');
+            var host = row && row.getAttribute('data-host');
+
+            if (!host) {
+                return;
+            }
+
+            var status = row.querySelector('.owpm-host-status');
+
+            btn.disabled = true;
+            status.textContent = S.hostFixCounting || 'Counting what this would change…';
+
+            // Count first, confirm against the real figure, only then write.
+            // A dialog that says "this cannot be undone" without saying how much
+            // it would do is asking for consent to an unknown quantity.
+            post('owpm_fix_links', { host: host, preview: 1 }).then(function (pre) {
+                status.textContent = '';
+
+                var lines = [];
+
+                if (pre.recognised) {
+                    lines.push((S.hostFixKnown || 'This site is recorded as having been migrated from %s, ' +
+                        'so these are almost certainly links that should point here now.')
+                        .replace(/%s/g, host));
+                } else {
+                    lines.push((S.hostFixUnknown || 'This site has no record of ever being at %s. If that is ' +
+                        'a site you link to on purpose, rewriting will turn every one of those links into a ' +
+                        'link to your own site.').replace(/%s/g, host));
+                }
+
+                lines.push((S.hostFixCount || '%1$d database row(s) will change, across: %2$s.')
+                    .replace('%1$d', String(pre.rows || 0))
+                    .replace('%2$s', (pre.tables || []).join(', ')));
+
+                if (pre.skipped && pre.skipped.length) {
+                    lines.push((S.hostFixSkipped || 'These tables also contain it but cannot be rewritten ' +
+                        'automatically, because they have no primary key to address a row by: %s. You will ' +
+                        'need to edit those by hand.').replace('%s', pre.skipped.join(', ')));
+                }
+
+                lines.push(S.hostFixUndo || 'This cannot be undone. If you are not sure, take a backup from ' +
+                    'the Export tab first.');
+
+                return dialog({
+                    title: (S.hostFixTitle || 'Rewrite links to this host?'),
+                    body: lines.join('\n\n'),
+                    confirmLabel: (S.hostFixBtn || 'Rewrite links'),
+                    danger: !pre.recognised
                 });
+            }).then(function (ok) {
+                if (!ok) {
+                    btn.disabled = false;
+                    status.textContent = '';
+                    return;
+                }
 
-                html += '</ul>';
-                verifyOut.innerHTML = html;
+                function step(state) {
+                    return post('owpm_fix_links', {
+                        host: host,
+                        pair: state.pair,
+                        table: state.table,
+                        offset: state.offset,
+                        rows: state.rows
+                    }).then(function (data) {
+                        if (data.done) {
+                            var left = data.remaining || [];
+
+                            // The counts on screen are now wrong, so re-read them.
+                            return runVerify().then(function () {
+                                if (!left.length) {
+                                    return null;
+                                }
+
+                                // Rewrote what it could and says what it could not,
+                                // rather than showing a tick over a site that is
+                                // still partly pointing at the old address.
+                                return dialog({
+                                    title: S.modalNotice || 'Open Migration',
+                                    body: (S.hostFixDone || '%d row(s) updated.')
+                                            .replace('%d', String(data.rows || 0)) + '\n\n' +
+                                        (S.hostFixLeft || 'Finished, but these still mention it and need a ' +
+                                            'look by hand: %s').replace('%s', left.join(', ')),
+                                    alert: true
+                                });
+                            });
+                        }
+
+                        status.textContent = (S.hostFixWorking || 'Rewriting… %d%%')
+                            .replace('%d', String(data.progress || 0));
+
+                        return step({
+                            pair: data.pair,
+                            table: data.table,
+                            offset: data.offset,
+                            rows: data.rows
+                        });
+                    });
+                }
+
+                status.textContent = S.hostFixWorking
+                    ? S.hostFixWorking.replace('%d', '0')
+                    : 'Rewriting… 0%';
+
+                return step({ pair: 0, table: 0, offset: 0, rows: 0 }).catch(function (err) {
+                    status.textContent = '';
+                    btn.disabled = false;
+
+                    return dialog({
+                        title: S.modalNotice || 'Open Migration',
+                        body: err.message,
+                        alert: true
+                    });
+                });
             }).catch(function (err) {
-                verifyOut.innerHTML = '<p class="owpm-error">' + esc(err.message) + '</p>';
-            }).then(function () {
-                verifyBtn.disabled = false;
-                verifyBtn.textContent = S.verifyRun || 'Run checks';
+                // Reaches here when the count itself failed or found nothing. The
+                // button has to come back either way: leaving it disabled with no
+                // message is a dead control and no explanation.
+                status.textContent = '';
+                btn.disabled = false;
+
+                return dialog({
+                    title: S.modalNotice || 'Open Migration',
+                    body: err.message,
+                    alert: true
+                });
             });
         });
     }

@@ -50,6 +50,174 @@ class OWPM_Rollback {
 	const MAX_TABLE_NAME = 64;
 
 	/**
+	 * Where a clean install parks the folders it used to delete outright.
+	 *
+	 * The same reasoning as RENAME TABLE, applied to files. Moving a folder
+	 * within one filesystem is a metadata operation: instant, no extra disk, and
+	 * exactly reversible. Copying wp-content first would need as much free space
+	 * as the site and take as long as an export.
+	 *
+	 * This sits inside the backup directory, which is already deny-all and on
+	 * the same filesystem as wp-content/plugins.
+	 *
+	 * The directory existing *is* the record. Nothing is written to the state
+	 * file about it, because the parking happens during extraction and the state
+	 * file is not written until the database phase -- so an import that died in
+	 * between would have left a state file claiming nothing and a pile of the
+	 * operator's plugins in a hidden folder with no way to find out.
+	 */
+	const PARKED_DIR = 'parked/';
+
+	/** Folders a clean install may park. Nothing else is ever moved. */
+	const PARKED_AREAS = array( 'themes', 'plugins' );
+
+	public static function parked_dir() {
+		return OWPM_FS::backup_dir() . self::PARKED_DIR;
+	}
+
+	/**
+	 * Move one theme or plugin folder aside instead of deleting it.
+	 *
+	 * Before this, "clean install" meant the operator's themes and plugins were
+	 * gone for good: the database snapshot could put the options back but had
+	 * nothing to say about files, so a rollback handed back a database
+	 * referencing plugins that no longer existed. Parking makes the restore
+	 * point cover both halves of the site.
+	 *
+	 * @param string $path Absolute folder to park.
+	 * @param string $area One of PARKED_AREAS.
+	 * @return bool
+	 */
+	public static function park_file( $path, $area ) {
+		if ( ! in_array( $area, self::PARKED_AREAS, true ) || ! is_dir( $path ) || is_link( $path ) ) {
+			return false;
+		}
+
+		$dir = self::parked_dir() . $area . '/';
+
+		if ( ! wp_mkdir_p( $dir ) ) {
+			return false;
+		}
+
+		OWPM_FS::protect_dir( self::parked_dir() );
+
+		$target = $dir . basename( $path );
+
+		if ( file_exists( $target ) ) {
+			// Already parked by an earlier attempt. That copy predates this one,
+			// so it is the one that represents the site before any of this began.
+			return OWPM_FS::delete( $path );
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename, WordPress.PHP.NoSilencedErrors.Discouraged -- see the note on PARKED_DIR: an atomic same-filesystem rename is the entire point, and WP_Filesystem::move() falls back to copy-then-delete on any non-direct transport, which would need as much free disk as the folder and stop being reversible half way. WP_Filesystem also wants credentials, and this runs mid-import where there is nobody to ask. A failed park is reported to the caller, which leaves the folder in place rather than deleting it.
+		return (bool) @rename( $path, $target );
+	}
+
+	/** How many folders are currently parked. */
+	public static function files_parked() {
+		$count = 0;
+
+		foreach ( self::PARKED_AREAS as $area ) {
+			foreach ( self::parked_entries( $area ) as $ignored ) {
+				++$count;
+			}
+		}
+
+		return $count;
+	}
+
+	/**
+	 * @param string $area One of PARKED_AREAS.
+	 * @return string[] Folder names.
+	 */
+	private static function parked_entries( $area ) {
+		$dir = self::parked_dir() . $area;
+
+		if ( ! is_dir( $dir ) ) {
+			return array();
+		}
+
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- an unreadable directory means nothing to restore.
+		$entries = @scandir( $dir );
+
+		if ( false === $entries ) {
+			return array();
+		}
+
+		$found = array();
+
+		foreach ( $entries as $entry ) {
+			if ( '.' === $entry || '..' === $entry ) {
+				continue;
+			}
+
+			if ( is_dir( $dir . '/' . $entry ) ) {
+				$found[] = $entry;
+			}
+		}
+
+		return $found;
+	}
+
+	/**
+	 * Put parked themes and plugins back where they came from.
+	 *
+	 * @return int Folders restored.
+	 */
+	public static function restore_files() {
+		$content  = OWPM_FS::content_dir();
+		$restored = 0;
+
+		foreach ( self::PARKED_AREAS as $area ) {
+			foreach ( self::parked_entries( $area ) as $entry ) {
+				$from = self::parked_dir() . $area . '/' . $entry;
+				$to   = $content . $area . '/' . $entry;
+
+				// Never move a copy of this plugin over the running one: that
+				// pulls the code out from under the request doing the restoring,
+				// which is the fault that took a site down in 1.3.16.
+				if ( 'plugins' === $area && 0 === strpos( strtolower( $entry ), 'open-migration' ) ) {
+					continue;
+				}
+
+				if ( ! OWPM_FS::is_inside( $to, $content ) ) {
+					continue;
+				}
+
+				// The archive may have brought its own folder of the same name.
+				// This is a rollback, so the original wins.
+				if ( file_exists( $to ) ) {
+					OWPM_FS::delete( $to );
+				}
+
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename, WordPress.PHP.NoSilencedErrors.Discouraged -- the counterpart of park_file(); same reasoning. Counted, and anything that fails stays parked for another attempt rather than being lost.
+				if ( @rename( $from, $to ) ) {
+					++$restored;
+				}
+			}
+		}
+
+		self::discard_files();
+
+		return $restored;
+	}
+
+	/** Throw away parked folders. Called once the import is known to be good. */
+	public static function discard_files() {
+		$dir = self::parked_dir();
+
+		if ( ! is_dir( $dir ) ) {
+			return 0;
+		}
+
+		$count = self::files_parked();
+
+		OWPM_FS::delete( $dir );
+
+		return $count;
+	}
+
+	/**
 	 * Park the site's current tables out of the way.
 	 *
 	 * @param string $file_id Import this snapshot belongs to.
@@ -58,7 +226,13 @@ class OWPM_Rollback {
 	public static function take( $file_id ) {
 		global $wpdb;
 
-		if ( self::exists() ) {
+		// Deliberately the table record and not exists(), which also counts
+		// parked files. A clean install parks folders during extraction, so by
+		// the time this runs exists() is already true for the very import asking
+		// for the snapshot -- and reading it here meant no clean install ever got
+		// a database snapshot at all. Only an earlier *table* snapshot is a
+		// reason to stand down.
+		if ( self::has_table_snapshot() ) {
 			// A previous import left one behind. Keep it: it is older, which makes
 			// it the one that represents the site before any of this started.
 			return array(
@@ -91,6 +265,23 @@ class OWPM_Rollback {
 		}
 
 		// Read before the rename: afterwards there is no options table to read.
+		//
+		// These four are what it takes for WordPress to stay usable while the
+		// real options table is parked, and the set was arrived at the hard way:
+		//
+		//   siteurl / home  is_blog_installed() answers yes, so wp_not_installed()
+		//                   does not send every visitor to install.php. That was
+		//                   the 1.5.1 security fix.
+		//   db_version      wp-admin compares it against $wp_db_version and
+		//                   redirects to upgrade.php when they differ. Absent, it
+		//                   differed from everything, so the dashboard was
+		//                   unreachable for as long as the snapshot existed.
+		//   active_plugins  with no value, WordPress loads NO plugins -- this one
+		//                   included. That left no admin page and no "Restore this
+		//                   site" button in the one state where they are the point,
+		//                   and no wp_ajax_owpm_import_db handler either, so an
+		//                   import whose dump needed a second request could not
+		//                   continue past this line.
 		$siteurl = (string) get_option( 'siteurl' );
 		$home    = (string) get_option( 'home' );
 
@@ -104,7 +295,7 @@ class OWPM_Rollback {
 				continue;
 			}
 
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $from, $to, $live, $parked and $table all come from OWPM_FS::esc_table(), which returns false for anything outside [A-Za-z0-9_$-] and backticks what is left, so no quote, backtick, space or semicolon can reach the statement. prepare() cannot bind an identifier -- %s would quote the table name into a string literal. The names are read from SHOW TABLES, never from a request.
 			$ok = $wpdb->query( "RENAME TABLE {$from} TO {$to}" );
 
 			if ( false === $ok ) {
@@ -178,6 +369,15 @@ class OWPM_Rollback {
 		$restore = '';
 		$discard = '';
 
+		// Written as a path relative to the site root, because the only tool
+		// available to someone locked out of wp-admin is an FTP client or the
+		// host's file manager, and both start there.
+		$parked_path = str_replace(
+			str_replace( '\\', '/', ABSPATH ),
+			'',
+			str_replace( '\\', '/', self::parked_dir() )
+		);
+
 		foreach ( $tables as $table ) {
 			$restore .= "DROP TABLE IF EXISTS `{$table}`;\n";
 			$discard .= 'DROP TABLE IF EXISTS `' . self::PREFIX . $table . "`;\n";
@@ -222,7 +422,14 @@ class OWPM_Rollback {
 			. "   That deletes what the import created and moves your original tables\n"
 			. "   back. Take a database export first if you can -- it costs a minute\n"
 			. "   and this step cannot be undone.\n\n"
-			. "5. WHEN EVERYTHING IS FINE AGAIN\n"
+			. "5. YOUR THEMES AND PLUGINS, IF YOU CHOSE \"CLEAN INSTALL\"\n"
+			. "   They were moved aside, not deleted. They are in:\n\n"
+			. '       ' . $parked_path . "\n\n"
+			. "   Inside that you will find themes/ and plugins/, each holding the\n"
+			. "   folders as they were. To put one back by hand, move its folder into\n"
+			. "   wp-content/themes or wp-content/plugins. The \"Restore this site\"\n"
+			. "   button does all of them at once if you can reach wp-admin.\n\n"
+			. "6. WHEN EVERYTHING IS FINE AGAIN\n"
 			. "   The parked copies are only taking up space. Remove them with:\n\n"
 			. $discard . "\n"
 			. str_repeat( '=', 64 ) . "\n"
@@ -243,12 +450,21 @@ class OWPM_Rollback {
 	public static function restore() {
 		global $wpdb;
 
+		// Files first, and deliberately not gated on the table snapshot. A clean
+		// install parks folders during extraction, which happens before the
+		// database phase takes its snapshot -- so an import that died in between
+		// has parked files and no table record at all. That is precisely the
+		// state that needs rescuing, and the old early return walked straight
+		// past it.
+		$files = self::restore_files();
+
 		$snapshot = self::read_state();
 
 		if ( ! is_array( $snapshot ) || empty( $snapshot['tables'] ) ) {
 			return array(
-				'restored' => false,
+				'restored' => ( $files > 0 ),
 				'tables'   => 0,
+				'files'    => $files,
 			);
 		}
 
@@ -259,7 +475,10 @@ class OWPM_Rollback {
 				continue;
 			}
 
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// Dropping tables is the operation, not a mistake: this is the step
+			// that clears what a failed import wrote before the originals are
+			// renamed back over it.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $from, $to, $live, $parked and $table all come from OWPM_FS::esc_table(), which returns false for anything outside [A-Za-z0-9_$-] and backticks what is left, so no quote, backtick, space or semicolon can reach the statement. prepare() cannot bind an identifier -- %s would quote the table name into a string literal. The names are read from SHOW TABLES, never from a request.
 			$wpdb->query( "DROP TABLE IF EXISTS {$live}" );
 		}
 
@@ -275,6 +494,7 @@ class OWPM_Rollback {
 		return array(
 			'restored' => true,
 			'tables'   => $count,
+			'files'    => $files,
 		);
 	}
 
@@ -285,6 +505,10 @@ class OWPM_Rollback {
 	 */
 	public static function discard() {
 		global $wpdb;
+
+		// Parked folders are dropped whether or not a table record exists: the
+		// two are written at different stages and either can be present alone.
+		self::discard_files();
 
 		$snapshot = self::read_state();
 
@@ -302,7 +526,9 @@ class OWPM_Rollback {
 				continue;
 			}
 
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// Discarding a snapshot means dropping the parked copies; there is
+			// no non-schema way to give the disk space back.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $from, $to, $live, $parked and $table all come from OWPM_FS::esc_table(), which returns false for anything outside [A-Za-z0-9_$-] and backticks what is left, so no quote, backtick, space or semicolon can reach the statement. prepare() cannot bind an identifier -- %s would quote the table name into a string literal. The names are read from SHOW TABLES, never from a request.
 			if ( false !== $wpdb->query( "DROP TABLE IF EXISTS {$parked}" ) ) {
 				++$dropped;
 			}
@@ -320,10 +546,29 @@ class OWPM_Rollback {
 	/**
 	 * Is there a snapshot waiting to be restored or discarded?
 	 */
-	public static function exists() {
+	/**
+	 * Is a database snapshot recorded? Parked files do not count.
+	 *
+	 * Separate from exists() because the two callers want different questions
+	 * answered. take() must know whether the *database* is already snapshotted;
+	 * the UI must know whether there is anything at all to restore.
+	 */
+	private static function has_table_snapshot() {
 		$snapshot = self::read_state();
 
 		return is_array( $snapshot ) && ! empty( $snapshot['tables'] );
+	}
+
+	public static function exists() {
+		if ( self::has_table_snapshot() ) {
+			return true;
+		}
+
+		// Parked themes and plugins are a restore point in their own right. An
+		// import that failed during extraction has those and nothing else, and
+		// reporting "nothing to restore" there would leave the operator's files
+		// sitting in a hidden folder with no button to bring them back.
+		return self::files_parked() > 0;
 	}
 
 	/**
@@ -333,13 +578,32 @@ class OWPM_Rollback {
 	 */
 	public static function details() {
 		$snapshot = self::read_state();
+		$files    = self::files_parked();
 
 		if ( ! is_array( $snapshot ) || empty( $snapshot['tables'] ) ) {
-			return false;
+			// Files alone still count. See exists().
+			if ( $files < 1 ) {
+				return false;
+			}
+
+			// The parked directory's own timestamp. There is no state file to read
+			// one from -- parking happens during extraction, before the database
+			// phase writes it -- and a zero here reaches human_time_diff() as the
+			// epoch, which renders as "56 years ago".
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- an unreadable directory just means no timestamp.
+			$when = @filemtime( self::parked_dir() );
+
+			return array(
+				'tables'  => 0,
+				'files'   => $files,
+				'taken'   => $when ? (int) $when : time(),
+				'siteurl' => '',
+			);
 		}
 
 		return array(
 			'tables'  => count( $snapshot['tables'] ),
+			'files'   => $files,
 			'taken'   => isset( $snapshot['taken'] ) ? (int) $snapshot['taken'] : 0,
 			'siteurl' => isset( $snapshot['siteurl'] ) ? (string) $snapshot['siteurl'] : '',
 		);
@@ -362,7 +626,7 @@ class OWPM_Rollback {
 	 * @param string $home    Home address read before the rename.
 	 */
 	private static function create_installed_marker( $siteurl, $home ) {
-		global $wpdb;
+		global $wpdb, $wp_db_version;
 
 		$table = OWPM_FS::esc_table( $wpdb->options );
 
@@ -376,7 +640,7 @@ class OWPM_Rollback {
 		// from wpdb itself. Neither can be bound as a placeholder -- prepare()
 		// binds values, not identifiers or charset clauses. Spans several lines,
 		// so disable/enable rather than a single-line ignore.
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter
 		$wpdb->query(
 			"CREATE TABLE IF NOT EXISTS {$table} (
 				option_id bigint(20) unsigned NOT NULL auto_increment,
@@ -387,18 +651,37 @@ class OWPM_Rollback {
 				UNIQUE KEY option_name (option_name)
 			) {$charset}"
 		);
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter
+
+		// Only this plugin. Loading the destination's other plugins against a
+		// database that is currently one table wide is how a rescue turns into a
+		// fatal, and third-party code is not needed to finish an import or press
+		// a restore button. The real list comes back with the dump, or with the
+		// rollback.
+		$self = 'open-migration-unlimited-site-transfer-backup/open-migration-unlimited-site-transfer-backup.php';
+
+		if ( defined( 'OWPM_PLUGIN_DIR' ) ) {
+			$folder = basename( untrailingslashit( OWPM_PLUGIN_DIR ) );
+			$self   = $folder . '/open-migration-unlimited-site-transfer-backup.php';
+		}
+
+		// $wp_db_version, not the live value: wp-admin redirects to upgrade.php
+		// unless they match exactly, and a dashboard that redirects is a
+		// dashboard with no restore button on it.
+		$db_version = isset( $wp_db_version ) ? (string) $wp_db_version : (string) get_option( 'db_version' );
 
 		foreach ( array(
-			'siteurl'  => $siteurl,
-			'home'     => $home,
-			'blogname' => __( 'Migration in progress', 'open-migration-unlimited-site-transfer-backup' ),
+			'siteurl'        => $siteurl,
+			'home'           => $home,
+			'blogname'       => __( 'Migration in progress', 'open-migration-unlimited-site-transfer-backup' ),
+			'db_version'     => $db_version,
+			'active_plugins' => serialize( array( $self ) ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- the options table stores PHP-serialised values; this is the format WordPress will read it back in.
 		) as $name => $value ) {
 			if ( '' === $value ) {
 				continue;
 			}
 
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter -- only the table name is interpolated, and it is a backticked identifier from esc_table(); every value below is bound by prepare().
 			$wpdb->query(
 				$wpdb->prepare(
 					// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is a validated identifier.
@@ -508,7 +791,7 @@ class OWPM_Rollback {
 				continue;
 			}
 
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $from, $to, $live, $parked and $table all come from OWPM_FS::esc_table(), which returns false for anything outside [A-Za-z0-9_$-] and backticks what is left, so no quote, backtick, space or semicolon can reach the statement. prepare() cannot bind an identifier -- %s would quote the table name into a string literal. The names are read from SHOW TABLES, never from a request.
 			if ( false !== $wpdb->query( "RENAME TABLE {$parked} TO {$live}" ) ) {
 				++$count;
 			}
