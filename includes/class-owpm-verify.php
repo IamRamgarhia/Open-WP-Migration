@@ -243,10 +243,20 @@ class OWPM_Verify {
 				LIMIT 2000"
 		);
 
-		$hosts = array();
+		$hosts  = array();
+		$broken = false;
 
 		foreach ( (array) $rows as $content ) {
-			if ( ! preg_match_all( '#href=["\']https?://([^/"\'?#]+)#i', (string) $content, $matches ) ) {
+			// Tilde delimiter on purpose. The character class has to contain # so
+			// a match stops at a fragment, and with # as the delimiter too, PCRE
+			// ends the pattern there: preg_match_all() then returns false for
+			// every row and this check quietly reports that every link is fine.
+			// It did exactly that on a site with twelve links to its old domain.
+			if ( ! preg_match_all( '~href=["\']https?://([^/"\'?#]+)~i', (string) $content, $matches ) ) {
+				if ( PREG_NO_ERROR !== preg_last_error() ) {
+					$broken = true;
+				}
+
 				continue;
 			}
 
@@ -259,6 +269,15 @@ class OWPM_Verify {
 
 				$hosts[ $host ] = isset( $hosts[ $host ] ) ? $hosts[ $host ] + 1 : 1;
 			}
+		}
+
+		if ( $broken ) {
+			// A check that could not run must not report a clean bill of health.
+			return $this->result(
+				__( 'Links to other domains', 'open-migration-unlimited-site-transfer-backup' ),
+				'warn',
+				__( 'This check could not be completed, so treat the result as unknown rather than clear. Please report it so it can be fixed.', 'open-migration-unlimited-site-transfer-backup' )
+			);
 		}
 
 		if ( empty( $hosts ) ) {

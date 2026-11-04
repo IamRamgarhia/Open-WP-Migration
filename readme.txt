@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.5.2
+Stable tag: 1.5.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -187,6 +187,9 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 
 == Changelog ==
 
+= 1.5.3 =
+* Fixed: the "links to other domains" check added in 1.5.2 never worked. Its pattern used # as both the delimiter and a character inside the pattern, so it failed to compile and the check reported that every link was fine — on a site that had twelve links pointing at the domain it was migrated from. A check that fails open is worse than no check, so it now also says plainly when it cannot complete instead of reporting all clear.
+
 = 1.5.2 =
 * Fixed: other plugins' admin notices appeared inside this plugin's dark header, where they were nearly unreadable — LiteSpeed Cache's "Purged all caches" showed as white text on a white box. WordPress moves notices to just after the first heading unless it finds a marker saying otherwise; that marker is now in place.
 * Added: the Verify tab reports which other domains your published content links to. The existing check only ran when an import had recorded where the site came from, and an import that crashed records nothing — which is exactly when content is most likely to still point at the old site. This one needs no record.
@@ -321,6 +324,9 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.5.3 =
+The link check added in 1.5.2 did not work and reported sites as clean when they were not. Update if you relied on it.
 
 = 1.5.2 =
 Fixes unreadable admin notices from other plugins, and makes the Verify tab able to spot links to an old site even when an import crashed.
