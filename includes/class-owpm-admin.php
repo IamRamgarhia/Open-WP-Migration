@@ -563,6 +563,31 @@ class OWPM_Admin {
 							<input type="file" id="owpm-import-file" accept=".zip,application/zip" />
 						</div>
 
+						<fieldset class="owpm-modes">
+							<legend><?php esc_html_e( 'What to do with themes and plugins already here', 'open-migration-unlimited-site-transfer-backup' ); ?></legend>
+
+							<label class="owpm-mode">
+								<input type="radio" name="owpm_import_mode" value="keep" checked="checked" />
+								<span>
+									<strong><?php esc_html_e( 'Keep them (recommended)', 'open-migration-unlimited-site-transfer-backup' ); ?></strong>
+									<?php esc_html_e( 'The archive is restored over the top. Anything this site has that the backup does not is left in place, deactivated.', 'open-migration-unlimited-site-transfer-backup' ); ?>
+								</span>
+							</label>
+
+							<label class="owpm-mode">
+								<input type="radio" name="owpm_import_mode" value="clean" />
+								<span>
+									<strong><?php esc_html_e( 'Clean install', 'open-migration-unlimited-site-transfer-backup' ); ?></strong>
+									<?php esc_html_e( 'Delete every theme and plugin on this site first, so it ends up matching the backup exactly. Media files, uploads and must-use plugins are never deleted.', 'open-migration-unlimited-site-transfer-backup' ); ?>
+								</span>
+							</label>
+
+							<p class="owpm-mode-warning" id="owpm-clean-warning" hidden>
+								<span class="dashicons dashicons-warning" aria-hidden="true"></span>
+								<?php esc_html_e( 'Clean install deletes files that are not in your backup, and nothing can undo it. If the import then fails, this site has no themes or plugins until you finish it or restore your own backup. Only choose this if the backup is known good.', 'open-migration-unlimited-site-transfer-backup' ); ?>
+							</p>
+						</fieldset>
+
 						<?php $this->progress_block( 'import' ); ?>
 
 						<?php $this->accordion_open( __( 'What happens during an import', 'open-migration-unlimited-site-transfer-backup' ) ); ?>

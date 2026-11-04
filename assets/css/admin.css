@@ -1050,3 +1050,57 @@ body.owpm-modal-open { overflow: hidden; }
     .owpm-tab span.dashicons { display: none; }
     .owpm-status-grid { grid-template-columns: 1fr; }
 }
+
+/* Import mode: keep existing themes and plugins, or clear them first. */
+.owpm-modes {
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	padding: 14px 16px;
+	margin: 16px 0 0;
+}
+
+.owpm-modes legend {
+	font-weight: 600;
+	color: #1d2327;
+	padding: 0 6px;
+}
+
+.owpm-mode {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+	padding: 8px 0;
+	cursor: pointer;
+}
+
+.owpm-mode input {
+	margin-top: 3px;
+	flex: 0 0 auto;
+}
+
+.owpm-mode span {
+	color: #50575e;
+	line-height: 1.5;
+}
+
+.owpm-mode strong {
+	display: block;
+	color: #1d2327;
+}
+
+.owpm-mode-warning {
+	display: flex;
+	gap: 8px;
+	align-items: flex-start;
+	margin: 6px 0 0;
+	padding: 10px 12px;
+	border-left: 3px solid #d63638;
+	background: #fcf0f1;
+	color: #1d2327;
+	line-height: 1.5;
+}
+
+.owpm-mode-warning .dashicons {
+	color: #d63638;
+	flex: 0 0 auto;
+}

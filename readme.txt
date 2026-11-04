@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.3.16
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -187,6 +187,11 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 
 == Changelog ==
 
+= 1.4.0 =
+* Added: a clean install option on the Import tab. The default is unchanged — the backup is restored over the top and anything this site already had is left alone. Choosing clean install deletes every theme and plugin first, so the destination ends up matching the backup instead of holding both sites' worth. Uploads and must-use plugins are never deleted, and the option has its own confirmation.
+* Added: after restoring a database from an older WordPress, the schema upgrade WordPress would normally run on your first visit to wp-admin is now run as part of the import, so the site is ready when the import says it is.
+* Changed: the warning shown when the source site ran newer PHP now says what to do about it, and a site on PHP older than 8.0 is told so even when the backup does not require anything newer.
+
 = 1.3.16 =
 * Fixed: an import could take the destination site down completely with "Cannot redeclare owpm_bootstrap()". If the source site had this plugin in a differently named folder, the archive's copy was restored alongside the running one and both declared the same function — a fatal on every request, wp-admin included, so the site could not be recovered from the dashboard. The archive's copy is now skipped whatever folder it was in, and the function is wrapped in function_exists() so a second copy can never cause a fatal. The existing guard did not cover this: PHP binds a top-level function at compile time, before the guard runs.
 
@@ -297,6 +302,9 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.4.0 =
+Adds an optional clean install mode and runs the WordPress database upgrade for you when importing from an older version.
 
 = 1.3.16 =
 Important. Fixes an import that could leave the destination site showing a critical error on every page. Update before your next migration.

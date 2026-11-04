@@ -23,6 +23,15 @@ class OWPM_Import {
 	const SQL_DELIMITER = '/* OWPM_EOS */';
 	const SESSION_TTL   = 21600; // 6 hours.
 
+	/**
+	 * PHP version suggested to anyone importing onto an older server.
+	 *
+	 * Deliberately conservative rather than the newest release: the point is to
+	 * flag servers that are past end of life, not to chase the latest version.
+	 * Worth raising as older branches age out.
+	 */
+	const RECOMMENDED_PHP = '8.0';
+
 	private $temp_dir;
 
 	public function __construct() {
@@ -319,8 +328,16 @@ class OWPM_Import {
 		// Handed to the browser once, in the response below; only the hash is stored.
 		$import_key = wp_generate_password( 64, false );
 
+		// Clean install: remove themes and plugins the archive does not carry, so
+		// the destination ends up matching the source instead of being the union
+		// of both. Off unless asked for -- see purge_for_clean_install().
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- the nonce is verified by the calling handler.
+		$clean_install = ! empty( $_POST['clean_install'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['clean_install'] ) );
+
 		$session = array(
 			'file_id'        => $file_id,
+			'clean_install'  => $clean_install ? 1 : 0,
+			'purged'         => 0,
 			'key_hash'       => hash( 'sha256', $import_key ),
 			'expires'        => time() + self::SESSION_TTL,
 			'created'        => time(),
@@ -392,13 +409,140 @@ class OWPM_Import {
 		if ( $source_php && version_compare( $source_php, PHP_VERSION, '>' ) ) {
 			$notices[] = sprintf(
 				/* translators: 1: source PHP version, 2: this server's PHP version. */
-				__( 'The source site ran PHP %1$s and this server runs %2$s. Some of the restored themes or plugins may require the newer version.', 'open-migration-unlimited-site-transfer-backup' ),
+				__( 'The source site ran PHP %1$s and this server runs the older %2$s. Themes and plugins written for the newer version can fail here with a blank page. Most hosts let you switch PHP version from the control panel in a minute — doing that before you import is worth the trouble.', 'open-migration-unlimited-site-transfer-backup' ),
 				$source_php,
 				PHP_VERSION
+			);
+		} elseif ( version_compare( PHP_VERSION, self::RECOMMENDED_PHP, '<' ) ) {
+			// Not tied to the archive at all: a site on an unsupported PHP is worth
+			// flagging while someone is already in here making changes.
+			$notices[] = sprintf(
+				/* translators: 1: this server's PHP version, 2: recommended PHP version. */
+				__( 'This server runs PHP %1$s, which no longer receives security updates. WordPress and most current themes and plugins expect PHP %2$s or newer. Your host can usually switch this from their control panel.', 'open-migration-unlimited-site-transfer-backup' ),
+				PHP_VERSION,
+				self::RECOMMENDED_PHP
 			);
 		}
 
 		return $notices;
+	}
+
+	/**
+	 * Remove themes and plugins the archive does not carry.
+	 *
+	 * Without this an import leaves the destination holding the union of both
+	 * sites: every theme and plugin folder that was here before survives
+	 * alongside the restored ones, inactive but present. Operators moving a site
+	 * to a new host generally want the new host to look like the old site, not
+	 * like both.
+	 *
+	 * Deliberately limited to themes/ and plugins/. Uploads are left alone: the
+	 * destination's media may be referenced by something the archive does not
+	 * know about, and deleting it is not recoverable from a backup of the
+	 * *source*. mu-plugins is left alone because managed hosts put their own
+	 * code there and removing it breaks the platform, not the site.
+	 *
+	 * Runs once, before extraction, so the archive then lands on a clean tree.
+	 *
+	 * @param array $session Import session.
+	 * @return int Number of directories removed.
+	 */
+	private function purge_for_clean_install( $session ) {
+		if ( empty( $session['clean_install'] ) ) {
+			return 0;
+		}
+
+		$content = OWPM_FS::content_dir();
+		$own     = basename( untrailingslashit( OWPM_PLUGIN_DIR ) );
+		$removed = 0;
+
+		foreach ( array( 'themes', 'plugins' ) as $area ) {
+			$dir = $content . $area;
+
+			if ( ! is_dir( $dir ) ) {
+				continue;
+			}
+
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- an unreadable directory is handled below.
+			$entries = @scandir( $dir );
+
+			if ( false === $entries ) {
+				continue;
+			}
+
+			foreach ( $entries as $entry ) {
+				if ( '.' === $entry || '..' === $entry ) {
+					continue;
+				}
+
+				$path = $dir . '/' . $entry;
+
+				if ( ! is_dir( $path ) || is_link( $path ) ) {
+					continue;
+				}
+
+				// Never remove this plugin. Deleting the code mid-import kills the
+				// request handling the rest of it, and any copy under a different
+				// folder name is the hazard that took a site down in 1.3.16.
+				if ( 'plugins' === $area
+					&& ( $entry === $own || 0 === strpos( strtolower( $entry ), 'open-migration' ) ) ) {
+					continue;
+				}
+
+				// Paranoia: never step outside wp-content.
+				if ( ! OWPM_FS::is_inside( $path, $content ) ) {
+					continue;
+				}
+
+				if ( OWPM_FS::delete( $path ) ) {
+					++$removed;
+				}
+			}
+		}
+
+		return $removed;
+	}
+
+	/**
+	 * Bring a restored database up to the schema this WordPress expects.
+	 *
+	 * Migrating from an older WordPress leaves db_version behind the core files
+	 * now running it. WordPress does upgrade a database forward by itself, but
+	 * only once somebody opens wp-admin and clicks through the prompt, and the
+	 * site can behave oddly until they do. Running it here means the import
+	 * finishes on a site that is actually ready.
+	 *
+	 * The reverse -- a database newer than core -- is not something wp_upgrade()
+	 * can fix, and the operator was warned about it before the import started
+	 * (see compatibility_notices()). Left alone rather than made worse.
+	 *
+	 * @return bool Whether the upgrade routine ran.
+	 */
+	private function maybe_upgrade_database() {
+		global $wp_db_version;
+
+		$restored = (int) get_option( 'db_version' );
+		$expected = isset( $wp_db_version ) ? (int) $wp_db_version : 0;
+
+		if ( ! $restored || ! $expected || $restored >= $expected ) {
+			return false;
+		}
+
+		$upgrade_file = OWPM_FS::root_dir() . 'wp-admin/includes/upgrade.php';
+
+		if ( ! file_exists( $upgrade_file ) ) {
+			return false;
+		}
+
+		require_once $upgrade_file;
+
+		if ( ! function_exists( 'wp_upgrade' ) ) {
+			return false;
+		}
+
+		wp_upgrade();
+
+		return true;
 	}
 
 	/* ---------------------------------------------------------------------
@@ -422,6 +566,20 @@ class OWPM_Import {
 		$zip = new ZipArchive();
 		if ( true !== $zip->open( $session['zip_path'] ) ) {
 			wp_send_json_error( __( 'The backup archive could not be opened.', 'open-migration-unlimited-site-transfer-backup' ) );
+		}
+
+		// Clean install clears the old themes and plugins before anything is
+		// written, so the archive lands on an empty tree. Only on the first
+		// batch: extraction resumes across requests and this must not repeat
+		// once files from the archive are already on disk.
+		if ( empty( $session['purged'] ) ) {
+			$session['purged'] = 1;
+
+			if ( ! empty( $session['clean_install'] ) ) {
+				$session['purged_dirs'] = $this->purge_for_clean_install( $session );
+			}
+
+			$this->write_session( $file_id, $session );
 		}
 
 		$total     = (int) $session['total_entries'];
@@ -1190,6 +1348,8 @@ class OWPM_Import {
 		update_option( 'upload_url_path', '' );
 
 		delete_option( 'owpm_current_export' );
+
+		$db_upgraded = $this->maybe_upgrade_database();
 
 		// Remember where this site came from. If the import ran against a host's
 		// temporary address, the Change Domain tab offers this back as a one-click

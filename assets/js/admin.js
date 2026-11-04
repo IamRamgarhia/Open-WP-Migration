@@ -456,7 +456,12 @@
 
         view.set(at(0.02), 'Inspecting backup…');
 
-        return post('owpm_import_prepare', { file_id: fileId }).then(function (prepared) {
+        // Clean install deletes themes and plugins that are not in the backup, so
+        // it is only ever sent when the operator picked that radio themselves.
+        var modeEl = document.querySelector('input[name="owpm_import_mode"]:checked');
+        var cleanInstall = modeEl && modeEl.value === 'clean' ? '1' : '0';
+
+        return post('owpm_import_prepare', { file_id: fileId, clean_install: cleanInstall }).then(function (prepared) {
             key = prepared.import_key;
             var payload = { file_id: fileId, import_key: prepared.import_key };
 
@@ -579,6 +584,18 @@
         triggerFileBtn.addEventListener('click', function () { fileInput.click(); });
     }
 
+    // Show the clean-install warning only while that option is actually selected.
+    var cleanWarning = document.getElementById('owpm-clean-warning');
+    var modeRadios = document.querySelectorAll('input[name="owpm_import_mode"]');
+
+    if (cleanWarning && modeRadios.length) {
+        Array.prototype.forEach.call(modeRadios, function (radio) {
+            radio.addEventListener('change', function () {
+                cleanWarning.hidden = this.value !== 'clean';
+            });
+        });
+    }
+
     if (fileInput) {
         fileInput.addEventListener('change', function (e) {
             if (e.target.files && e.target.files.length) {
@@ -623,10 +640,25 @@
             return;
         }
 
+        var mode = document.querySelector('input[name="owpm_import_mode"]:checked');
+        var isClean = mode && mode.value === 'clean';
+
+        // Clean install deletes files no backup of the source can bring back, so
+        // it gets its own confirmation rather than riding on the general one.
+        var body = (S.confirmImport || '') + '\n\n' + file.name;
+        if (isClean) {
+            body += '\n\n' + (S.confirmClean
+                || 'Clean install is selected. Every theme and plugin on this site will be deleted before the backup is restored. This cannot be undone.');
+        }
+
         dialog({
-            title: S.confirmImportTitle || 'Overwrite this site?',
-            body: (S.confirmImport || '') + '\n\n' + file.name,
-            confirmLabel: S.confirmImportBtn || 'Overwrite this site',
+            title: isClean
+                ? (S.confirmCleanTitle || 'Delete themes and plugins, then overwrite?')
+                : (S.confirmImportTitle || 'Overwrite this site?'),
+            body: body,
+            confirmLabel: isClean
+                ? (S.confirmCleanBtn || 'Delete and overwrite')
+                : (S.confirmImportBtn || 'Overwrite this site'),
             danger: true
         }).then(function (ok) {
             if (!ok) {
