@@ -1073,4 +1073,95 @@
                 esc(S.backupsFailed || 'Failed to load backups.') + '</p>';
         });
     }
+
+    /* -----------------------------------------------------------------
+     * Verify: read-only health check after a migration.
+     * -------------------------------------------------------------- */
+
+    var verifyBtn = document.getElementById('owpm-run-verify');
+    var verifyOut = document.getElementById('owpm-verify-results');
+
+    if (verifyBtn && verifyOut) {
+        verifyBtn.addEventListener('click', function () {
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = S.verifyRunning || 'Checking…';
+            verifyOut.innerHTML = '';
+
+            post('owpm_verify', {}).then(function (data) {
+                var rows = (data && data.checks) || [];
+                var html = '<ul class="owpm-checks">';
+
+                rows.forEach(function (c) {
+                    html += '<li class="owpm-check owpm-check-' + esc(c.status) + '">' +
+                        '<span class="owpm-check-dot" aria-hidden="true"></span>' +
+                        '<div><strong>' + esc(c.label) + '</strong>' +
+                        '<span>' + esc(c.detail) + '</span></div></li>';
+                });
+
+                html += '</ul>';
+                verifyOut.innerHTML = html;
+            }).catch(function (err) {
+                verifyOut.innerHTML = '<p class="owpm-error">' + esc(err.message) + '</p>';
+            }).then(function () {
+                verifyBtn.disabled = false;
+                verifyBtn.textContent = S.verifyRun || 'Run checks';
+            });
+        });
+    }
+
+    /* -----------------------------------------------------------------
+     * Rollback: put the site back after an import that never finished.
+     * -------------------------------------------------------------- */
+
+    var rollbackBtn = document.getElementById('owpm-do-rollback');
+    var discardBtn = document.getElementById('owpm-drop-rollback');
+    var rollbackBanner = document.getElementById('owpm-rollback-banner');
+
+    if (rollbackBtn) {
+        rollbackBtn.addEventListener('click', function () {
+            dialog({
+                title: S.rollbackTitle || 'Put this site back?',
+                body: S.rollbackBody || 'Everything the unfinished import wrote will be deleted and your original database restored. This cannot be undone.',
+                confirmLabel: S.rollbackBtn || 'Restore this site',
+                danger: true
+            }).then(function (ok) {
+                if (!ok) { return; }
+                rollbackBtn.disabled = true;
+                rollbackBtn.textContent = S.rollbackRunning || 'Restoring…';
+
+                post('owpm_rollback', {}).then(function (data) {
+                    return notify((data && data.message) || 'Restored.');
+                }).then(function () {
+                    window.location.reload();
+                }).catch(function (err) {
+                    rollbackBtn.disabled = false;
+                    rollbackBtn.textContent = S.rollbackBtn || 'Restore this site';
+                    notify(err.message);
+                });
+            });
+        });
+    }
+
+    if (discardBtn) {
+        discardBtn.addEventListener('click', function () {
+            dialog({
+                title: S.discardTitle || 'Discard the saved copy?',
+                body: S.discardBody || 'The copy of your database from before the import will be deleted. You will no longer be able to roll back.',
+                confirmLabel: S.discardBtn || 'Discard',
+                danger: true
+            }).then(function (ok) {
+                if (!ok) { return; }
+                discardBtn.disabled = true;
+
+                post('owpm_discard_rollback', {}).then(function (data) {
+                    if (rollbackBanner) { rollbackBanner.remove(); }
+                    return notify((data && data.message) || 'Removed.');
+                }).catch(function (err) {
+                    discardBtn.disabled = false;
+                    notify(err.message);
+                });
+            });
+        });
+    }
+
 })();

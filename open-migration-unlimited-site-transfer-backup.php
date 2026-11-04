@@ -3,7 +3,7 @@
  * Plugin Name: Open Migration - Unlimited Site Transfer & Backup
  * Plugin URI:  https://dicecodes.com/open-migration/
  * Description: Move, clone, back up and restore a WordPress site with no upload size limit. URLs, server paths and table prefixes are converted automatically.
- * Version:     1.4.1
+ * Version:     1.5.0
  * Requires at least: 5.6
  * Requires PHP: 7.2
  * Author:      DiceCodes
@@ -24,18 +24,20 @@ if ( defined( 'OWPM_VERSION' ) ) {
 	return;
 }
 
-define( 'OWPM_VERSION', '1.4.1' );
+define( 'OWPM_VERSION', '1.5.0' );
 define( 'OWPM_PLUGIN_FILE', __FILE__ );
 define( 'OWPM_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OWPM_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 require_once OWPM_PLUGIN_DIR . 'includes/class-owpm-fs.php';
+require_once OWPM_PLUGIN_DIR . 'includes/class-owpm-rollback.php';
 require_once OWPM_PLUGIN_DIR . 'includes/class-owpm-search-replace.php';
 require_once OWPM_PLUGIN_DIR . 'includes/class-owpm-admin.php';
 require_once OWPM_PLUGIN_DIR . 'includes/class-owpm-export.php';
 require_once OWPM_PLUGIN_DIR . 'includes/class-owpm-import.php';
 require_once OWPM_PLUGIN_DIR . 'includes/class-owpm-api.php';
 require_once OWPM_PLUGIN_DIR . 'includes/class-owpm-domain.php';
+require_once OWPM_PLUGIN_DIR . 'includes/class-owpm-verify.php';
 
 /**
  * Boot the plugin.
@@ -66,6 +68,7 @@ if ( ! function_exists( 'owpm_bootstrap' ) ) {
 		new OWPM_Import();
 		new OWPM_API();
 		new OWPM_Domain();
+		new OWPM_Verify();
 	}
 }
 add_action( 'plugins_loaded', 'owpm_bootstrap' );

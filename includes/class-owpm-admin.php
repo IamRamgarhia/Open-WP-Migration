@@ -452,6 +452,10 @@ class OWPM_Admin {
 						<span class="dashicons dashicons-database" aria-hidden="true"></span>
 						<?php esc_html_e( 'Backups', 'open-migration-unlimited-site-transfer-backup' ); ?>
 					</button>
+					<button type="button" class="owpm-tab" data-target="verify" role="tab" aria-selected="false" aria-controls="panel-verify">
+						<span class="dashicons dashicons-yes-alt" aria-hidden="true"></span>
+						<?php esc_html_e( 'Verify', 'open-migration-unlimited-site-transfer-backup' ); ?>
+					</button>
 				</nav>
 
 				<div class="owpm-panels">
@@ -536,6 +540,34 @@ class OWPM_Admin {
 								<?php esc_html_e( 'Restore an Open Migration .zip onto this install. You do not need to prepare anything first — a brand new WordPress works fine.', 'open-migration-unlimited-site-transfer-backup' ); ?>
 							</p>
 						</div>
+
+						<?php $snapshot = OWPM_Rollback::details(); ?>
+						<?php if ( $snapshot ) : ?>
+							<div class="owpm-alert owpm-alert-warning" id="owpm-rollback-banner">
+								<span class="dashicons dashicons-backup" aria-hidden="true"></span>
+								<div>
+									<strong><?php esc_html_e( 'An earlier import did not finish.', 'open-migration-unlimited-site-transfer-backup' ); ?></strong>
+									<p>
+										<?php
+										printf(
+											/* translators: 1: number of tables, 2: how long ago. */
+											esc_html__( 'This site\'s original database was set aside before that import started — %1$d table(s), %2$s ago — and it is still there. If this site is not right, you can put it back exactly as it was. If everything is fine, discard the copy to free the space.', 'open-migration-unlimited-site-transfer-backup' ),
+											(int) $snapshot['tables'],
+											esc_html( human_time_diff( $snapshot['taken'] ) )
+										);
+										?>
+									</p>
+									<p>
+										<button type="button" class="owpm-btn owpm-btn-primary" id="owpm-do-rollback">
+											<?php esc_html_e( 'Restore this site', 'open-migration-unlimited-site-transfer-backup' ); ?>
+										</button>
+										<button type="button" class="owpm-btn owpm-btn-secondary" id="owpm-drop-rollback">
+											<?php esc_html_e( 'Discard the copy', 'open-migration-unlimited-site-transfer-backup' ); ?>
+										</button>
+									</p>
+								</div>
+							</div>
+						<?php endif; ?>
 
 						<div class="owpm-alert owpm-alert-danger">
 							<span class="dashicons dashicons-warning" aria-hidden="true"></span>
@@ -769,6 +801,22 @@ class OWPM_Admin {
 							</p>
 						</div>
 						<div id="owpm-backups-container"></div>
+					</section>
+
+					<section id="panel-verify" class="owpm-panel" role="tabpanel" tabindex="0">
+						<div class="owpm-panel-head">
+							<h2><?php esc_html_e( 'Check this site after a migration', 'open-migration-unlimited-site-transfer-backup' ); ?></h2>
+							<?php $this->docs_link( 'after-import', __( 'Post-migration documentation', 'open-migration-unlimited-site-transfer-backup' ) ); ?>
+							<p class="owpm-lead">
+								<?php esc_html_e( 'A site that loads is not proof the migration finished cleanly. This looks for the things that go wrong quietly — references still pointing at the old address, settings corrupted by a find-and-replace, plugins marked active that are not installed. Nothing here changes anything.', 'open-migration-unlimited-site-transfer-backup' ); ?>
+							</p>
+						</div>
+
+						<button type="button" class="owpm-btn owpm-btn-primary" id="owpm-run-verify">
+							<?php esc_html_e( 'Run checks', 'open-migration-unlimited-site-transfer-backup' ); ?>
+						</button>
+
+						<div id="owpm-verify-results"></div>
 					</section>
 
 				</div>

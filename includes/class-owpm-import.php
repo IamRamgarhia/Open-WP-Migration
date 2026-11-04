@@ -40,6 +40,11 @@ class OWPM_Import {
 		add_action( 'wp_ajax_owpm_upload_chunk', array( $this, 'ajax_upload_chunk' ) );
 		add_action( 'wp_ajax_owpm_import_prepare', array( $this, 'ajax_prepare' ) );
 
+		// Recovery after an import that never finished. Logged-in only: there is
+		// no import session to authorise against by the time these are needed.
+		add_action( 'wp_ajax_owpm_rollback', array( $this, 'ajax_rollback' ) );
+		add_action( 'wp_ajax_owpm_discard_rollback', array( $this, 'ajax_discard_rollback' ) );
+
 		// Also registered for logged-out requests, as a fallback.
 		//
 		// Restoring the database replaces wp_users and the session tokens in
@@ -1027,6 +1032,15 @@ class OWPM_Import {
 			$probe               = fread( $handle, 65536 );
 			$session['sql_mode'] = ( false !== strpos( (string) $probe, self::SQL_DELIMITER ) ) ? 'marker' : 'semicolon';
 			rewind( $handle );
+
+			// Last moment at which this site is still entirely its old self. Park
+			// the current tables so a failure from here on is recoverable; the dump
+			// creates its own under the live names. Costs no disk and no time --
+			// see OWPM_Rollback for why it renames instead of copying.
+			$snapshot                = OWPM_Rollback::take( $file_id );
+			$session['rollback']     = $snapshot['taken'] ? 1 : 0;
+			$session['rollback_why'] = $snapshot['reason'];
+			$this->write_session( $file_id, $session );
 		}
 
 		fseek( $handle, (int) $session['sql_offset'] );
@@ -1532,6 +1546,11 @@ class OWPM_Import {
 		$boot        = $this->ensure_site_boots();
 		$db_upgraded = $this->maybe_upgrade_database();
 
+		// The import worked, so the old tables are no longer insurance -- they are
+		// just a second copy of a site nobody wants, taking up space. Dropped last,
+		// after everything that could still have failed.
+		$snapshot_dropped = OWPM_Rollback::discard();
+
 		// Remember where this site came from. If the import ran against a host's
 		// temporary address, the Change Domain tab offers this back as a one-click
 		// suggestion instead of making the user retype a domain from memory.
@@ -1650,6 +1669,65 @@ class OWPM_Import {
 	 * Abort / cleanup
 	 * ------------------------------------------------------------------ */
 
+	/**
+	 * Put the site back from a snapshot a previous import left behind.
+	 *
+	 * Separate from ajax_abort() because the case this exists for is the one
+	 * where there was no chance to cancel: the import died -- fatal, timeout,
+	 * closed laptop -- and the operator comes back to a site that is part one
+	 * install and part another. There is no session left to authorise against,
+	 * so this is an ordinary admin action behind a nonce and manage_options.
+	 */
+	public function ajax_rollback() {
+		check_ajax_referer( 'owpm_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
+		}
+
+		OWPM_FS::raise_limits();
+
+		if ( ! OWPM_Rollback::exists() ) {
+			wp_send_json_error( __( 'There is nothing to restore. No unfinished import left a snapshot.', 'open-migration-unlimited-site-transfer-backup' ) );
+		}
+
+		$result = OWPM_Rollback::restore();
+
+		wp_send_json_success(
+			array(
+				'tables'  => $result['tables'],
+				'message' => sprintf(
+					/* translators: %d: number of database tables restored. */
+					_n( 'This site has been put back as it was, restoring %d table.', 'This site has been put back as it was, restoring %d tables.', $result['tables'], 'open-migration-unlimited-site-transfer-backup' ),
+					$result['tables']
+				),
+			)
+		);
+	}
+
+	/**
+	 * Throw away a snapshot the operator has decided they no longer need.
+	 */
+	public function ajax_discard_rollback() {
+		check_ajax_referer( 'owpm_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
+		}
+
+		$dropped = OWPM_Rollback::discard();
+
+		wp_send_json_success(
+			array(
+				'message' => sprintf(
+					/* translators: %d: number of database tables removed. */
+					_n( 'Snapshot removed, freeing %d table.', 'Snapshot removed, freeing %d tables.', $dropped, 'open-migration-unlimited-site-transfer-backup' ),
+					$dropped
+				),
+			)
+		);
+	}
+
 	public function ajax_abort() {
 		$file_id = $this->request_file_id();
 
@@ -1659,6 +1737,10 @@ class OWPM_Import {
 
 		$session = $this->read_session( $file_id );
 
+		// If the database restore had already started, the site is part way
+		// between two installs. Put it back rather than leaving it there.
+		$restored = OWPM_Rollback::exists() ? OWPM_Rollback::restore() : array( 'restored' => false );
+
 		if ( $session ) {
 			OWPM_FS::delete( $session['zip_path'] );
 			OWPM_FS::delete( $session['work_dir'] );
@@ -1666,6 +1748,10 @@ class OWPM_Import {
 
 		$this->delete_session( $file_id );
 
-		wp_send_json_success( __( 'Import cancelled.', 'open-migration-unlimited-site-transfer-backup' ) );
+		wp_send_json_success(
+			empty( $restored['restored'] )
+				? __( 'Import cancelled.', 'open-migration-unlimited-site-transfer-backup' )
+				: __( 'Import cancelled and this site put back the way it was.', 'open-migration-unlimited-site-transfer-backup' )
+		);
 	}
 }

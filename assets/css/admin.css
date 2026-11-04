@@ -1104,3 +1104,58 @@ body.owpm-modal-open { overflow: hidden; }
 	color: #d63638;
 	flex: 0 0 auto;
 }
+
+/* Verify tab: one line per health check. */
+.owpm-checks {
+	margin: 18px 0 0;
+	padding: 0;
+	list-style: none;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	overflow: hidden;
+}
+
+.owpm-check {
+	display: flex;
+	gap: 11px;
+	align-items: flex-start;
+	padding: 13px 15px;
+	margin: 0;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.owpm-check:last-child {
+	border-bottom: 0;
+}
+
+.owpm-check div {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.owpm-check strong {
+	color: #1d2327;
+}
+
+.owpm-check span:not(.owpm-check-dot) {
+	color: #50575e;
+	line-height: 1.5;
+}
+
+.owpm-check-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	margin-top: 5px;
+	flex: 0 0 auto;
+	background: #8c8f94;
+}
+
+.owpm-check-ok .owpm-check-dot { background: #00a32a; }
+.owpm-check-warn .owpm-check-dot { background: #dba617; }
+.owpm-check-fail .owpm-check-dot { background: #d63638; }
+.owpm-check-info .owpm-check-dot { background: #2271b1; }
+
+.owpm-check-fail { background: #fcf0f1; }
+.owpm-check-warn { background: #fcf9e8; }

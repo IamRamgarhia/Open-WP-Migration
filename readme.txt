@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.4.1
+Stable tag: 1.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -187,6 +187,11 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 
 == Changelog ==
 
+= 1.5.0 =
+* Added: an import can now be undone. Before the database restore begins, this site's existing tables are set aside rather than overwritten — instantly, using no extra disk space. If the import fails, is cancelled, or dies mid-way, the Import tab offers to put the site back exactly as it was. A successful import clears the copy automatically.
+* Added: a plain-text recovery file is written to the backups folder when an import starts, for the case where the site is broken badly enough that the dashboard cannot be reached. It explains how to disable plugins over FTP, how to read the error log, and includes the exact SQL to restore this site's database by hand, with its real table names.
+* Added: a Verify tab. After a migration it checks the site address, counts anything in the database still referring to the old address, finds settings corrupted by a find-and-replace, and reports on active plugins, the active theme, uploads, permalinks, the admin email and search engine visibility. It only reads; nothing is changed.
+
 = 1.4.1 =
 * Added: an import can no longer leave a site that will not load. Any plugin the restored database says is active but which is not installed here is dropped from the list, and a missing active theme is switched to one that exists. Previously WordPress tried to load the missing file on every request, which on some plugins is a fatal that takes wp-admin down with it.
 * Added: the pre-import check now warns when there is not enough free disk space to unpack the backup, and when the database holds tables belonging to another site.
@@ -307,6 +312,9 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.5.0 =
+Adds a one-click undo for a failed import, an on-disk recovery guide, and a Verify tab for checking a site after a migration.
 
 = 1.4.1 =
 Recommended. An import can no longer leave the destination unable to load.
