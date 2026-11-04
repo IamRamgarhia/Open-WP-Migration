@@ -76,6 +76,23 @@ class OWPM_FS {
 	}
 
 	/**
+	 * Absolute path (trailing slash) of the plugins directory.
+	 *
+	 * WP_PLUGIN_DIR is the documented way to find it and already accounts for a
+	 * relocated plugins folder. Read here and nowhere else, like content_dir().
+	 * Used to check whether a plugin a restored database claims is active
+	 * actually exists on this server -- not to locate this plugin's own files,
+	 * which come from OWPM_PLUGIN_DIR.
+	 */
+	public static function plugins_dir() {
+		if ( defined( 'WP_PLUGIN_DIR' ) ) {
+			return trailingslashit( str_replace( '\\', '/', WP_PLUGIN_DIR ) );
+		}
+
+		return self::content_dir() . 'plugins/';
+	}
+
+	/**
 	 * Absolute path (trailing slash) of the WordPress root.
 	 *
 	 * Recorded in the archive so absolute paths stored in the source database can

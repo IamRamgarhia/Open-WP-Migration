@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.4.0
+Stable tag: 1.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -187,6 +187,11 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 
 == Changelog ==
 
+= 1.4.1 =
+* Added: an import can no longer leave a site that will not load. Any plugin the restored database says is active but which is not installed here is dropped from the list, and a missing active theme is switched to one that exists. Previously WordPress tried to load the missing file on every request, which on some plugins is a fatal that takes wp-admin down with it.
+* Added: the pre-import check now warns when there is not enough free disk space to unpack the backup, and when the database holds tables belonging to another site.
+* Fixed: clean install no longer deletes the theme the site is currently using. Removing every theme left nothing to fall back to if the import then failed.
+
 = 1.4.0 =
 * Added: a clean install option on the Import tab. The default is unchanged — the backup is restored over the top and anything this site already had is left alone. Choosing clean install deletes every theme and plugin first, so the destination ends up matching the backup instead of holding both sites' worth. Uploads and must-use plugins are never deleted, and the option has its own confirmation.
 * Added: after restoring a database from an older WordPress, the schema upgrade WordPress would normally run on your first visit to wp-admin is now run as part of the import, so the site is ready when the import says it is.
@@ -302,6 +307,9 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.4.1 =
+Recommended. An import can no longer leave the destination unable to load.
 
 = 1.4.0 =
 Adds an optional clean install mode and runs the WordPress database upgrade for you when importing from an older version.

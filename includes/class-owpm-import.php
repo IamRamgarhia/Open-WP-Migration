@@ -376,7 +376,10 @@ class OWPM_Import {
 				'source_url'    => $session['old_url'],
 				'target_url'    => $session['new_url'],
 				'prefix_change' => ( $session['old_prefix'] && $session['old_prefix'] !== $session['new_prefix'] ),
-				'notices'       => $this->compatibility_notices( $metadata ),
+				'notices'       => array_merge(
+					$this->compatibility_notices( $metadata ),
+					$this->capacity_notices( $session['zip_path'] )
+				),
 			)
 		);
 	}
@@ -389,6 +392,71 @@ class OWPM_Import {
 	 * it, so restoring a newer dump onto older core can leave the site broken in
 	 * ways that are hard to diagnose.
 	 */
+	/**
+	 * Warn about things that would make the import fail part-way.
+	 *
+	 * Running out of disk half-way through extraction is the worst kind of
+	 * failure: files are partly written, and on a shared host the first symptom
+	 * is often a site that no longer loads. The Export tab checks free space
+	 * before it starts and the import should too -- unpacking needs room for the
+	 * archive's contents on top of the archive itself.
+	 *
+	 * A prefix already in use is the other one. It does not break anything by
+	 * itself, but it means another site's tables share this database, and an
+	 * import that drops and recreates them takes that site with it.
+	 *
+	 * @param string $zip_path Uploaded archive.
+	 * @return string[]
+	 */
+	private function capacity_notices( $zip_path ) {
+		global $wpdb;
+
+		$notices = array();
+
+		$archive = file_exists( $zip_path ) ? (int) filesize( $zip_path ) : 0;
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- unavailable on some hosts; handled below.
+		$free = @disk_free_space( OWPM_FS::content_dir() );
+
+		// Compressed WordPress archives are mostly media, which barely compresses,
+		// so the unpacked size lands near the archive size. Asking for twice it
+		// leaves room for the database restore and the working copy as well.
+		if ( $archive > 0 && false !== $free && $free > 0 && $free < ( $archive * 2 ) ) {
+			$notices[] = sprintf(
+				/* translators: 1: free disk space, 2: archive size. */
+				__( 'This server has %1$s free and the backup is %2$s. Unpacking needs room for the contents as well as the archive, so this import may run out of space part-way through and leave the site incomplete. Free some space first.', 'open-migration-unlimited-site-transfer-backup' ),
+				size_format( $free ),
+				size_format( $archive )
+			);
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$all = $wpdb->get_col( 'SHOW TABLES' );
+
+		if ( is_array( $all ) ) {
+			$mine  = 0;
+			$other = 0;
+
+			foreach ( $all as $table ) {
+				if ( 0 === strpos( $table, $wpdb->prefix ) ) {
+					++$mine;
+				} else {
+					++$other;
+				}
+			}
+
+			if ( $other > 0 ) {
+				$notices[] = sprintf(
+					/* translators: 1: number of tables, 2: this site's table prefix. */
+					__( 'This database holds %1$d table(s) that do not belong to this site (its prefix is %2$s). The import only touches this site\'s tables, but if another WordPress install shares this database, make sure you are importing onto the right one.', 'open-migration-unlimited-site-transfer-backup' ),
+					$other,
+					$wpdb->prefix
+				);
+			}
+		}
+
+		return $notices;
+	}
+
 	private function compatibility_notices( $metadata ) {
 		$notices = array();
 
@@ -456,6 +524,14 @@ class OWPM_Import {
 		$own     = basename( untrailingslashit( OWPM_PLUGIN_DIR ) );
 		$removed = 0;
 
+		// Keep the theme that is running. Clearing every theme folder leaves a
+		// site with none at all, and if extraction then fails there is nothing
+		// for ensure_site_boots() to fall back to -- no theme means no front end
+		// and no wp-admin. The archive's own theme overwrites or sits beside this
+		// one, so the only cost is an extra inactive theme after a good import.
+		$keep_theme = array( (string) get_option( 'stylesheet' ), (string) get_option( 'template' ) );
+		$keep_theme = array_filter( array_unique( $keep_theme ) );
+
 		foreach ( array( 'themes', 'plugins' ) as $area ) {
 			$dir = $content . $area;
 
@@ -489,6 +565,10 @@ class OWPM_Import {
 					continue;
 				}
 
+				if ( 'themes' === $area && in_array( $entry, $keep_theme, true ) ) {
+					continue;
+				}
+
 				// Paranoia: never step outside wp-content.
 				if ( ! OWPM_FS::is_inside( $path, $content ) ) {
 					continue;
@@ -501,6 +581,105 @@ class OWPM_Import {
 		}
 
 		return $removed;
+	}
+
+	/**
+	 * Make sure the restored site can actually boot.
+	 *
+	 * A database carries the source site's active_plugins and active theme. If
+	 * any of those are not present here -- the archive did not include them, the
+	 * operator chose not to restore files, a plugin was skipped as unsafe -- then
+	 * WordPress tries to load a file that does not exist on every single request.
+	 * Depending on the plugin that is a warning, a blank page, or a fatal that
+	 * takes wp-admin down with it, leaving no way back in through the browser.
+	 *
+	 * So: anything the restored options point at that is not on disk gets
+	 * dropped here, while this request still has a working site to do it from.
+	 * Losing an inactive plugin is a nuisance. Losing wp-admin is an outage.
+	 *
+	 * @return array Report of what had to be corrected.
+	 */
+	private function ensure_site_boots() {
+		$report = array(
+			'plugins_dropped' => array(),
+			'theme_switched'  => '',
+		);
+
+		$active = get_option( 'active_plugins' );
+
+		if ( is_array( $active ) ) {
+			$plugins_dir = OWPM_FS::plugins_dir();
+			$keep        = array();
+
+			foreach ( $active as $plugin_file ) {
+				$plugin_file = (string) $plugin_file;
+
+				// Reject anything that is not a plain "folder/file.php" as well as
+				// anything missing: a path that escapes the plugins directory is not
+				// something to hand back to WordPress to include.
+				$path = $plugins_dir . ltrim( $plugin_file, '/' );
+
+				if ( '' !== $plugin_file
+					&& false === strpos( $plugin_file, '..' )
+					&& OWPM_FS::is_inside( $path, $plugins_dir )
+					&& file_exists( $path ) ) {
+					$keep[] = $plugin_file;
+					continue;
+				}
+
+				$report['plugins_dropped'][] = $plugin_file;
+			}
+
+			if ( count( $keep ) !== count( $active ) ) {
+				update_option( 'active_plugins', $keep );
+			}
+		}
+
+		// The active theme is the other way a restored database can leave a site
+		// unable to render. WordPress falls back for a missing parent in some
+		// cases but not reliably, so pick something that exists.
+		$stylesheet = (string) get_option( 'stylesheet' );
+		$template   = (string) get_option( 'template' );
+
+		$stylesheet_ok = $stylesheet && wp_get_theme( $stylesheet )->exists();
+		$template_ok   = $template && wp_get_theme( $template )->exists();
+
+		if ( ! $stylesheet_ok || ! $template_ok ) {
+			$fallback = $this->first_available_theme();
+
+			if ( '' !== $fallback ) {
+				update_option( 'stylesheet', $fallback );
+				update_option( 'template', $fallback );
+				$report['theme_switched'] = $fallback;
+			}
+		}
+
+		return $report;
+	}
+
+	/**
+	 * Pick a theme that is actually installed, preferring a WordPress default.
+	 *
+	 * @return string Theme directory name, or '' if the site has no themes at all.
+	 */
+	private function first_available_theme() {
+		$themes = wp_get_themes();
+
+		if ( empty( $themes ) ) {
+			return '';
+		}
+
+		// A bundled theme is the safest landing place: no missing parent, no
+		// build step, and the operator will recognise it as "not mine".
+		foreach ( array_keys( $themes ) as $slug ) {
+			if ( 0 === strpos( $slug, 'twenty' ) ) {
+				return $slug;
+			}
+		}
+
+		$slugs = array_keys( $themes );
+
+		return (string) reset( $slugs );
 	}
 
 	/**
@@ -1349,6 +1528,8 @@ class OWPM_Import {
 
 		delete_option( 'owpm_current_export' );
 
+		// Before anything else that loads WordPress again: make sure it can.
+		$boot        = $this->ensure_site_boots();
 		$db_upgraded = $this->maybe_upgrade_database();
 
 		// Remember where this site came from. If the import ran against a host's
