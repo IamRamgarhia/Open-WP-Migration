@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.5.1
+Stable tag: 1.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -187,6 +187,11 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 
 == Changelog ==
 
+= 1.5.2 =
+* Fixed: other plugins' admin notices appeared inside this plugin's dark header, where they were nearly unreadable — LiteSpeed Cache's "Purged all caches" showed as white text on a white box. WordPress moves notices to just after the first heading unless it finds a marker saying otherwise; that marker is now in place.
+* Added: the Verify tab reports which other domains your published content links to. The existing check only ran when an import had recorded where the site came from, and an import that crashed records nothing — which is exactly when content is most likely to still point at the old site. This one needs no record.
+* Fixed: an import now notes the address it came from as soon as the database restore finishes, rather than at the very end. An import that failed during the search-replace used to leave nothing behind, so the Change Domain tab could not offer the old address and the Verify tab had nothing to look for.
+
 = 1.5.1 =
 * Security: fixed a flaw introduced in 1.5.0. While an import was running, every one of this site's tables was set aside at once, including the options table. With no options table WordPress concludes it is not installed and sends all visitors to the installer, where anyone at all could have claimed the site and made themselves an administrator — no password needed, for as long as the restore took. A minimal stand-in options table is now put in place immediately, so WordPress still sees an installed site and the installer stays shut. If you installed 1.5.0, update before running another import.
 * Fixed: a snapshot record left behind after the tables it describes are gone — someone restores a database by hand, for instance — no longer blocks every future snapshot or offer a rollback that cannot work. It is detected and cleared.
@@ -316,6 +321,9 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.5.2 =
+Fixes unreadable admin notices from other plugins, and makes the Verify tab able to spot links to an old site even when an import crashed.
 
 = 1.5.1 =
 Security fix. 1.5.0 could expose the WordPress installer to anyone while an import was running. Update before importing again.

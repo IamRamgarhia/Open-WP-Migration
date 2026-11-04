@@ -1125,6 +1125,15 @@ class OWPM_Import {
 			// old URL and may not even have this plugin marked active.
 			$this->post_restore_repair( $session );
 
+			// Record where this site came from as soon as the record can survive.
+			// This used to be written only at the very end of the import, so an
+			// import that died during the search-replace left nothing behind --
+			// and that is exactly the case where content is still full of the old
+			// address. Change Domain then had no address to offer and the Verify
+			// tab had nothing to scan for. Writing it here means a crash after
+			// this point still leaves the operator able to finish the job.
+			$this->record_source( $session );
+
 			// The restored users table is now in place, so sign the operator back
 			// in immediately. The remaining steps then authenticate normally.
 			$fresh_nonce = $this->refresh_session( $session );
@@ -1554,15 +1563,7 @@ class OWPM_Import {
 		// Remember where this site came from. If the import ran against a host's
 		// temporary address, the Change Domain tab offers this back as a one-click
 		// suggestion instead of making the user retype a domain from memory.
-		update_option(
-			'owpm_last_import',
-			array(
-				'source_url' => (string) $session['old_url'],
-				'target_url' => (string) $session['new_url'],
-				'when'       => time(),
-			),
-			false
-		);
+		$this->record_source( $session );
 
 		// Rebuild caches and rewrite rules for the new domain.
 		wp_cache_flush();
@@ -1668,6 +1669,34 @@ class OWPM_Import {
 	/* ---------------------------------------------------------------------
 	 * Abort / cleanup
 	 * ------------------------------------------------------------------ */
+
+	/**
+	 * Note which address this site was migrated from.
+	 *
+	 * Read by the Change Domain tab, which offers it rather than making someone
+	 * retype a domain from memory, and by the Verify tab, which counts anything
+	 * still referring to it. Written as soon as the database restore finishes
+	 * and again at the end, so an import that fails in between still leaves it.
+	 *
+	 * @param array $session Import session.
+	 */
+	private function record_source( $session ) {
+		$source = isset( $session['old_url'] ) ? (string) $session['old_url'] : '';
+
+		if ( '' === $source ) {
+			return;
+		}
+
+		update_option(
+			'owpm_last_import',
+			array(
+				'source_url' => $source,
+				'target_url' => isset( $session['new_url'] ) ? (string) $session['new_url'] : '',
+				'when'       => time(),
+			),
+			false
+		);
+	}
 
 	/**
 	 * Put the site back from a snapshot a previous import left behind.

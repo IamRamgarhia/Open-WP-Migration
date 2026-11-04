@@ -406,6 +406,18 @@ class OWPM_Admin {
 				</div>
 			</noscript>
 
+			<?php
+			/*
+			 * WordPress moves every admin notice to just after the first <h1> in
+			 * .wrap unless it finds a .wp-header-end marker. Our <h1> lives inside
+			 * a dark header, so other plugins' notices were landing in there and
+			 * rendering near-invisible -- LiteSpeed's "Purged all caches" was
+			 * white text on a white box. This marker is the supported way to say
+			 * where notices belong.
+			 */
+			?>
+			<hr class="wp-header-end" />
+
 			<div class="owpm-shell" id="owpm-app-root">
 
 				<header class="owpm-header">

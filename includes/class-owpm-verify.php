@@ -76,6 +76,7 @@ class OWPM_Verify {
 			$checks[] = $this->check_stale_urls( $old );
 		}
 
+		$checks[] = $this->check_foreign_domains();
 		$checks[] = $this->check_active_plugins();
 		$checks[] = $this->check_active_theme();
 		$checks[] = $this->check_uploads();
@@ -211,6 +212,80 @@ class OWPM_Verify {
 				implode( ', ', array_slice( $where, 0, 8 ) )
 			),
 			$total
+		);
+	}
+
+	/**
+	 * Find other domains your own content links to.
+	 *
+	 * The check above only runs when an import recorded where this site came
+	 * from. An import that crashed before finishing records nothing, which is
+	 * exactly the situation where something is most likely to have been left
+	 * pointing at the old site -- so the one case that needs checking is the one
+	 * that gets skipped.
+	 *
+	 * This needs no record. It reads the links in published content and reports
+	 * any host that is not this one. A site that was migrated and not fully
+	 * converted shows up immediately as a pile of links to its old address.
+	 * External links are normal, so this reports rather than warns, and the
+	 * operator recognises their own old domain at a glance.
+	 */
+	private function check_foreign_domains() {
+		global $wpdb;
+
+		$self = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_col(
+			"SELECT post_content FROM {$wpdb->posts}
+				WHERE post_status = 'publish'
+				AND post_content LIKE '%href=%'
+				LIMIT 2000"
+		);
+
+		$hosts = array();
+
+		foreach ( (array) $rows as $content ) {
+			if ( ! preg_match_all( '#href=["\']https?://([^/"\'?#]+)#i', (string) $content, $matches ) ) {
+				continue;
+			}
+
+			foreach ( $matches[1] as $host ) {
+				$host = strtolower( $host );
+
+				if ( '' === $host || strtolower( (string) $self ) === $host ) {
+					continue;
+				}
+
+				$hosts[ $host ] = isset( $hosts[ $host ] ) ? $hosts[ $host ] + 1 : 1;
+			}
+		}
+
+		if ( empty( $hosts ) ) {
+			return $this->result(
+				__( 'Links to other domains', 'open-migration-unlimited-site-transfer-backup' ),
+				'ok',
+				__( 'Every link in your published content points at this site.', 'open-migration-unlimited-site-transfer-backup' )
+			);
+		}
+
+		arsort( $hosts );
+		$top  = array_slice( $hosts, 0, 5, true );
+		$list = array();
+
+		foreach ( $top as $host => $count ) {
+			$list[] = $host . ' (' . $count . ')';
+		}
+
+		return $this->result(
+			__( 'Links to other domains', 'open-migration-unlimited-site-transfer-backup' ),
+			'info',
+			sprintf(
+				/* translators: %s: list of host names with link counts. */
+				__( 'Your published content links to: %s. Links to other people\'s sites are perfectly normal — but if you recognise the site you migrated from in that list, those links still send your visitors there. Put the old address into the Change Domain tab to convert them.', 'open-migration-unlimited-site-transfer-backup' ),
+				implode( ', ', $list )
+			),
+			array_sum( $hosts )
 		);
 	}
 
