@@ -76,8 +76,27 @@ class OWPM_Import {
 	 * Session handling
 	 * ------------------------------------------------------------------ */
 
+	/**
+	 * Server-chosen, unguessable name for everything this import stores.
+	 *
+	 * $file_id is picked by the browser, so until now it named the archive, the
+	 * working directory and the session file. Two problems with that. The
+	 * browser's id was a timestamp plus Math.random(), which is neither secret
+	 * nor a cryptographic source; and the deny rules written into the backup
+	 * directory are Apache and IIS only, so on Nginx anyone who worked out an
+	 * id could fetch the uploaded archive, the database dump inside the working
+	 * directory, or the session file -- which names the archive's path.
+	 *
+	 * wp_hash() is keyed on the site's own salts, so the on-disk name cannot be
+	 * derived from the id. The id stays as the handle the browser passes back
+	 * and forth; it simply no longer decides where anything lands.
+	 */
+	private function storage_slug( $file_id ) {
+		return wp_hash( 'owpm-import|' . (string) $file_id );
+	}
+
 	private function session_path( $file_id ) {
-		return $this->temp_dir . '.owpm-session-' . $file_id . '.json';
+		return $this->temp_dir . '.owpm-session-' . $this->storage_slug( $file_id ) . '.json';
 	}
 
 	private function read_session( $file_id ) {
@@ -203,7 +222,7 @@ class OWPM_Import {
 			wp_send_json_error( __( 'The uploaded chunk could not be verified.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
-		$file_path = $this->temp_dir . $file_id . '.zip';
+		$file_path = $this->temp_dir . $this->storage_slug( $file_id ) . '.zip';
 
 		if ( ! OWPM_FS::is_inside( $file_path, $this->temp_dir ) ) {
 			wp_send_json_error( __( 'Invalid upload target.', 'open-migration-unlimited-site-transfer-backup' ) );
@@ -287,7 +306,7 @@ class OWPM_Import {
 			wp_send_json_error( __( 'Invalid import identifier.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
-		$zip_path = $this->temp_dir . $file_id . '.zip';
+		$zip_path = $this->temp_dir . $this->storage_slug( $file_id ) . '.zip';
 
 		if ( ! file_exists( $zip_path ) || ! OWPM_FS::is_inside( $zip_path, $this->temp_dir ) ) {
 			wp_send_json_error( __( 'The uploaded backup file could not be found.', 'open-migration-unlimited-site-transfer-backup' ) );
@@ -324,7 +343,7 @@ class OWPM_Import {
 			wp_send_json_error( __( 'This backup came from a multisite network, which is not supported yet.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
-		$work_dir = $this->temp_dir . $file_id . '-work';
+		$work_dir = $this->temp_dir . $this->storage_slug( $file_id ) . '-work';
 		OWPM_FS::delete( $work_dir );
 		wp_mkdir_p( $work_dir );
 

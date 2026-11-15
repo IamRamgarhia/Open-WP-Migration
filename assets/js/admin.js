@@ -36,6 +36,32 @@
             .replace(/'/g, '&#039;');
     }
 
+    /**
+     * A token from the platform's cryptographic source.
+     *
+     * The upload id used to be Date.now() plus Math.random(). The server no
+     * longer lets that id name anything on disk -- it hashes it with the site's
+     * salts first -- but Math.random() is not a cryptographic source in any
+     * browser, and an identifier worth having is worth generating properly.
+     */
+    function randomToken() {
+        var bytes = new Uint8Array(16);
+
+        if (window.crypto && window.crypto.getRandomValues) {
+            window.crypto.getRandomValues(bytes);
+        } else {
+            // Nothing modern enough to have crypto also predates everything else
+            // here, but an id is still needed.
+            for (var i = 0; i < bytes.length; i++) {
+                bytes[i] = Math.floor(Math.random() * 256);
+            }
+        }
+
+        return Array.prototype.map.call(bytes, function (b) {
+            return ('0' + b.toString(16)).slice(-2);
+        }).join('');
+    }
+
     function messageOf(data, fallback) {
         if (typeof data === 'string' && data) {
             return data;
@@ -796,7 +822,7 @@
 
         var chunkSize = Number(owpm_ajax.chunk_size) || (2 * 1024 * 1024);
         var totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
-        var fileId = 'import_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+        var fileId = 'import_' + Date.now() + '_' + randomToken();
 
         uploadChunk(0);
 

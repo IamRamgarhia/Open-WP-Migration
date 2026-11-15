@@ -217,8 +217,10 @@ class OWPM_Domain {
 	public function ajax_check() {
 		$this->guard();
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		$raw     = isset( $_POST['new_url'] ) ? wp_unslash( $_POST['new_url'] ) : '';
+		// Sanitised on the way in: wp_unslash() is not a sanitiser, and this
+		// value reaches the DNS probe and the response body.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$raw     = isset( $_POST['new_url'] ) ? sanitize_text_field( wp_unslash( $_POST['new_url'] ) ) : '';
 		$new_url = $this->normalize_url( $raw );
 
 		if ( is_wp_error( $new_url ) ) {
@@ -292,8 +294,6 @@ class OWPM_Domain {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
 		}
-
-		OWPM_FS::raise_limits();
 	}
 
 	/**
@@ -383,10 +383,26 @@ class OWPM_Domain {
 				return new WP_Error( 'invalid', __( 'That address contains a relative path segment, which is not valid in a site address.', 'open-migration-unlimited-site-transfer-backup' ) );
 			}
 
+			// The scheme, host and port were each checked above; the path was not,
+			// and it was appended exactly as typed. It then became siteurl and
+			// home, and came back out in the DNS probe's response. A subdirectory
+			// install is a few plain path segments, so anything else is rejected
+			// rather than quietly encoded -- the same choice this function makes
+			// everywhere else, because silently "fixing" an address rewrites the
+			// whole database to somewhere the operator did not mean.
+			if ( ! preg_match( '#^(/[A-Za-z0-9._~-]+)+$#', $path ) ) {
+				return new WP_Error(
+					'invalid',
+					__( 'That address contains characters that are not valid in a site path. A subdirectory address looks like https://example.com/blog.', 'open-migration-unlimited-site-transfer-backup' )
+				);
+			}
+
 			$clean .= $path;
 		}
 
-		return untrailingslashit( $clean );
+		// Belt and braces over the validation above: this is the value that gets
+		// stored, so it leaves through WordPress's own URL sanitiser.
+		return esc_url_raw( untrailingslashit( $clean ) );
 	}
 
 	/**
@@ -426,11 +442,20 @@ class OWPM_Domain {
 	public function ajax_start() {
 		$this->guard();
 
+		// Raised here rather than in guard(), which runs for every action on
+		// this tab: lifting the execution limit for a directory listing or a
+		// DNS lookup takes the whole site outside whatever ceiling the host
+		// set, for work that finishes in milliseconds.
+		OWPM_FS::raise_limits();
+
 		// The nonce is verified by guard() above. normalize_url() validates and
 		// rebuilds the value with esc_url_raw(), which is stricter than
 		// sanitize_text_field() would be for a URL.
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		$raw_url = isset( $_POST['new_url'] ) ? wp_unslash( $_POST['new_url'] ) : '';
+		// Sanitised here as well as validated in normalize_url(). wp_unslash()
+		// only undoes WordPress's slashes; it is not a sanitiser, and the value
+		// ends up in siteurl and home.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$raw_url = isset( $_POST['new_url'] ) ? sanitize_text_field( wp_unslash( $_POST['new_url'] ) ) : '';
 
 		$new_url = $this->normalize_url( $raw_url );
 
@@ -495,6 +520,12 @@ class OWPM_Domain {
 
 	public function ajax_step() {
 		$this->guard();
+
+		// Raised here rather than in guard(), which runs for every action on
+		// this tab: lifting the execution limit for a directory listing or a
+		// DNS lookup takes the whole site outside whatever ceiling the host
+		// set, for work that finishes in milliseconds.
+		OWPM_FS::raise_limits();
 
 		$job = get_option( self::STATE_OPTION );
 

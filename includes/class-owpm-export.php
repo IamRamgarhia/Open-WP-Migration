@@ -43,8 +43,6 @@ class OWPM_Export {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
 		}
-
-		OWPM_FS::raise_limits();
 	}
 
 	/**
@@ -77,6 +75,10 @@ class OWPM_Export {
 		global $wpdb;
 
 		$this->guard();
+
+		// Counts rows in every table on the site, so it genuinely needs the
+		// headroom -- unlike the listing and delete actions that share guard().
+		OWPM_FS::raise_limits();
 
 		$rows  = array();
 		$total = 0;
@@ -147,6 +149,12 @@ class OWPM_Export {
 
 	public function ajax_start_export() {
 		$this->guard();
+
+		// Raised here rather than in guard(), which runs for every action on
+		// this tab: lifting the execution limit for a directory listing or a
+		// DNS lookup takes the whole site outside whatever ceiling the host
+		// set, for work that finishes in milliseconds.
+		OWPM_FS::raise_limits();
 
 		if ( is_multisite() ) {
 			wp_send_json_error( __( 'Multisite networks are not supported yet. Please export a single site install.', 'open-migration-unlimited-site-transfer-backup' ) );
@@ -587,6 +595,12 @@ class OWPM_Export {
 	public function ajax_export_db() {
 		$this->guard();
 
+		// Raised here rather than in guard(), which runs for every action on
+		// this tab: lifting the execution limit for a directory listing or a
+		// DNS lookup takes the whole site outside whatever ceiling the host
+		// set, for work that finishes in milliseconds.
+		OWPM_FS::raise_limits();
+
 		global $wpdb;
 
 		$state = $this->require_state();
@@ -747,6 +761,12 @@ class OWPM_Export {
 	public function ajax_export_files() {
 		$this->guard();
 
+		// Raised here rather than in guard(), which runs for every action on
+		// this tab: lifting the execution limit for a directory listing or a
+		// DNS lookup takes the whole site outside whatever ceiling the host
+		// set, for work that finishes in milliseconds.
+		OWPM_FS::raise_limits();
+
 		$state = $this->require_state();
 
 		$zip      = new ZipArchive();
@@ -898,6 +918,12 @@ class OWPM_Export {
 
 	public function ajax_finish_export() {
 		$this->guard();
+
+		// Raised here rather than in guard(), which runs for every action on
+		// this tab: lifting the execution limit for a directory listing or a
+		// DNS lookup takes the whole site outside whatever ceiling the host
+		// set, for work that finishes in milliseconds.
+		OWPM_FS::raise_limits();
 
 		$state = $this->require_state();
 

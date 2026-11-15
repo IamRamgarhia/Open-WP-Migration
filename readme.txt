@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.6.4
+Stable tag: 1.6.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -186,6 +186,11 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 5. Managing existing backups.
 
 == Changelog ==
+
+= 1.6.5 =
+* Security: the browser no longer decides where anything is stored on disk. The uploaded archive, its working directory and the import session file were all named from an identifier the browser chose — a timestamp plus Math.random() — so anyone who worked out that name could fetch the archive, the database dump inside the working directory, or the session file that names the archive's path. The deny rules this plugin writes are Apache and IIS only, so on Nginx nothing else stopped them. Those names are now derived server-side with wp_hash(), keyed on the site's own salts, and the browser's identifier is generated from crypto.getRandomValues().
+* Fixed: the execution time limit was being lifted for every action on the Export and Change Domain tabs, including listing backups and checking DNS — routine work that finishes in milliseconds, and no reason to take a site outside the limits its host has set. It is now raised only by the operations that stream archives or walk every table.
+* Fixed: a new site address had its scheme, host and port validated but its path accepted exactly as typed, then stored in siteurl and home and echoed back in the DNS check response. The path is now validated as a plain subdirectory and the result passes through esc_url_raw(), and both entry points sanitise the submitted value rather than only unslashing it.
 
 = 1.6.4 =
 * Fixed: the slim-down selection arriving from the browser was unslashed but never sanitised. It was already reduced to a fixed list of known keys before any SQL was built, so nothing could be injected through it, but the value is now run through sanitize_text_field() on the way in as well.
