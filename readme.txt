@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.6.5
+Stable tag: 1.6.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -36,6 +36,37 @@ This step cannot be automatic. WordPress only ever sees the hostname a visitor r
 = Direct site-to-site transfer =
 
 Instead of downloading and re-uploading an archive, the source site can issue a one-time token. Paste the token into the destination site and it pulls the archive directly over the WordPress REST API, then runs the same automatic conversion.
+
+= A restore point before anything changes =
+
+An import replaces the site it runs on, so Open Migration takes a restore point
+first and offers it back if anything goes wrong — from the error screen, or from
+the plugin's own screen later.
+
+The database side is a rename rather than a copy, so it is instant and costs no
+extra disk whatever the size of the site. Files are moved aside rather than
+deleted. If the import fails half way, or the result is not what you expected,
+one button puts the site back as it was.
+
+= A clean migration, if you want one =
+
+A site that has been running for years carries expired transients, orphaned
+metadata, spam, revisions and tables belonging to plugins that were removed long
+ago. The import can leave all of that behind, so the new site starts smaller and
+faster than the old one.
+
+It is opt-in and folded away, because a migration is not the moment to surprise
+anyone. Every option says what it will remove before it removes it, and the
+restore point above is taken either way. The same options are available on a
+direct site-to-site transfer.
+
+= It refuses rather than breaking things =
+
+Before anything is written, Open Migration compares the PHP and WordPress
+versions at both ends. A site exported from PHP 8.2 does not quietly half-import
+onto PHP 7.2: the import stops, says what the mismatch is, and tells you how to
+change the PHP version at your host. It also reports which URLs still need
+changing after a move, with the number of rows each change would touch.
 
 = What gets exported =
 
@@ -177,6 +208,28 @@ The only thing written outside `wp-content/uploads/open-migration-unlimited-site
 = Is it really free? =
 
 Yes. There is no paid tier, no feature held back, no upsell, and no size limit. It is GPLv2 open source.
+= Can I undo an import? =
+
+Yes. A restore point is taken before the import begins, and it is offered back
+from the error screen if something fails or from the plugin's screen afterwards
+if the result is not what you wanted. The database side is a table rename, so it
+is instant and uses no extra disk; files are moved aside rather than deleted.
+
+= Can I leave the old clutter behind when I move? =
+
+Yes, and it is opt-in. The import can skip expired transients, orphaned
+metadata, spam, post revisions and tables left behind by plugins that are no
+longer installed, so the new site is smaller than the old one. Each option says
+what it removes before it removes it, and the restore point is taken whether or
+not you use any of them.
+
+= What happens if the new host runs a different PHP version? =
+
+The import stops before writing anything and tells you. Open Migration compares
+the PHP and WordPress versions at both ends first, and a mismatch that would
+break the site is a refusal with the steps to change the PHP version at your
+host — not a half-finished import you discover later.
+
 == Screenshots ==
 
 1. Export tab with the server check and progress reporting.
@@ -186,6 +239,11 @@ Yes. There is no paid tier, no feature held back, no upsell, and no size limit. 
 5. Managing existing backups.
 
 == Changelog ==
+
+= 1.6.6 =
+
+* Documentation only; the plugin itself is unchanged from 1.6.5.
+* The restore point taken before every import, the option to leave old clutter behind, and the refusal to import across an incompatible PHP or WordPress version were described only in the changelog. They are now in the description and the FAQ, where somebody deciding whether to install can read them.
 
 = 1.6.5 =
 * Security: the browser no longer decides where anything is stored on disk. The uploaded archive, its working directory and the import session file were all named from an identifier the browser chose — a timestamp plus Math.random() — so anyone who worked out that name could fetch the archive, the database dump inside the working directory, or the session file that names the archive's path. The deny rules this plugin writes are Apache and IIS only, so on Nginx nothing else stopped them. Those names are now derived server-side with wp_hash(), keyed on the site's own salts, and the browser's identifier is generated from crypto.getRandomValues().

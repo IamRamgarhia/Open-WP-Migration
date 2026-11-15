@@ -30,7 +30,7 @@
       "name": "Open Migration – Unlimited Site Transfer & Backup",
       "applicationCategory": "BrowserApplication",
       "operatingSystem": "WordPress 5.6 or newer, PHP 7.2 or newer",
-      "softwareVersion": "1.3.12",
+      "softwareVersion": "1.6.6",
       "installUrl": "https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/",
       "downloadUrl": "https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/",
       "description": "A free and open source WordPress migration and backup plugin. Exports a complete site to a single .zip and restores it onto any other WordPress install, converting site URLs, server paths and database table prefixes automatically. Chunked uploads remove the host's file size limit.",
@@ -205,7 +205,7 @@ footer a{font-weight:600}
       <span class="badge">GPLv2</span>
       <span class="badge">No file size cap</span>
       <span class="badge">No account required</span>
-      <span class="badge">v1.3.12</span>
+      <span class="badge">v1.6.6</span>
       <a class="badge" href="https://wordpress.org/plugins/open-migration-unlimited-site-transfer-backup/" rel="noopener">On WordPress.org</a>
     </div>
   </div>
@@ -357,8 +357,10 @@ footer a{font-weight:600}
     </figure>
     <div class="warn">
       <p><strong>An import replaces the destination site.</strong> Its posts, users, themes,
-      plugins and media are overwritten by the contents of the archive, and it cannot be undone.
-      Export a backup of the destination first if you might need it.</p>
+      plugins and media are overwritten by the contents of the archive. A
+      <a href="#restore-point">restore point</a> is taken first and the site can be put back
+      from it, but the replacement itself is wholesale: everything on the destination gives way
+      to what is in the archive.</p>
     </div>
 
     <ol class="steps">
@@ -371,6 +373,42 @@ footer a{font-weight:600}
       <li><strong>Sign in with the original site's account</strong>
           The archive brings its own users, so your current login stops working.</li>
     </ol>
+  </section>
+
+  <section id="restore-point">
+    <h2>The restore point, and putting a site back</h2>
+    <p>
+      Before an import writes anything, Open Migration takes a restore point of the site it is
+      about to replace. If the import fails, the error screen offers it back. If the import
+      succeeds but the result is not what you expected, the plugin's own screen offers it back
+      afterwards.
+    </p>
+    <p>
+      The database side is a table rename rather than a copy, so it is instant and uses no extra
+      disk however large the site is. Files are moved aside rather than deleted. Putting the site
+      back is the same two operations in reverse.
+    </p>
+    <p>
+      This is not a substitute for your own backups — it exists to undo <em>this import</em>, and
+      it is cleared once you tell the plugin you are happy with the result. For a copy you keep,
+      export the destination before you start.
+    </p>
+  </section>
+
+  <section id="clean-migration">
+    <h2>Leaving the old clutter behind</h2>
+    <p>
+      A site that has run for years carries expired transients, orphaned metadata, spam,
+      post revisions, and tables belonging to plugins that were removed long ago. An import can
+      leave all of that behind, so the site you land on is smaller and faster than the one you
+      left.
+    </p>
+    <p>
+      The options are folded away and off by default, because a migration is not the moment to
+      surprise anyone. Each one says what it will remove before it removes it, and the restore
+      point above is taken whether or not you use any of them. The same options are available on
+      a <a href="#site-to-site">direct site-to-site transfer</a>.
+    </p>
   </section>
 
   <section id="after-import">
@@ -589,6 +627,8 @@ footer a{font-weight:600}
         <li><a href="#install">Installing the plugin</a></li>
         <li><a href="#export">Exporting a site</a></li>
         <li><a href="#import">Importing onto a new WordPress</a></li>
+        <li><a href="#restore-point">The restore point</a></li>
+        <li><a href="#clean-migration">Leaving the old clutter behind</a></li>
         <li><a href="#after-import">What to do after an import</a></li>
         <li><a href="#change-domain">Migrating before you switch DNS</a></li>
         <li><a href="#site-to-site">Direct site-to-site transfer</a></li>
