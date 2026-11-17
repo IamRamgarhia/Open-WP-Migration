@@ -285,6 +285,16 @@ class OWPM_Admin {
 			// here, where there is room for it.
 			'dontLeave'          => __( 'This is running now. Leaving or reloading this page stops it part way through.', 'open-migration-unlimited-site-transfer-backup' ),
 			'dontLeavePull'      => __( 'The archive is downloading now. Leaving or reloading this page stops the transfer, and it has to start again from the beginning.', 'open-migration-unlimited-site-transfer-backup' ),
+
+			// The panel that holds the screen while a job runs.
+			'jobRunning'         => __( 'Working…', 'open-migration-unlimited-site-transfer-backup' ),
+			'jobExport'          => __( 'Building the backup', 'open-migration-unlimited-site-transfer-backup' ),
+			'jobImport'          => __( 'Restoring this site', 'open-migration-unlimited-site-transfer-backup' ),
+			'jobPull'            => __( 'Transferring the site', 'open-migration-unlimited-site-transfer-backup' ),
+			'jobDomain'          => __( 'Changing the address', 'open-migration-unlimited-site-transfer-backup' ),
+			'jobRollback'        => __( 'Putting the site back', 'open-migration-unlimited-site-transfer-backup' ),
+			'jobDontClose'       => __( 'Leave this page open. Closing or reloading it stops the job part way through.', 'open-migration-unlimited-site-transfer-backup' ),
+			'modalClose'         => __( 'Close', 'open-migration-unlimited-site-transfer-backup' ),
 			'noDomain'           => __( 'Please enter the new site address.', 'open-migration-unlimited-site-transfer-backup' ),
 			'continueAnyway'     => __( 'Continue with the import anyway?', 'open-migration-unlimited-site-transfer-backup' ),
 			'importCancelled'    => __( 'Import cancelled.', 'open-migration-unlimited-site-transfer-backup' ),

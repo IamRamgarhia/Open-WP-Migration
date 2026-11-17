@@ -335,29 +335,167 @@
     }
 
     /** Progress bar + status line controller. */
+    /**
+     * A progress panel in the middle of the screen that holds the page.
+     *
+     * An export or an import is a chain of steps driven from this page, and
+     * wandering off mid-chain is how people end up with a half-restored site.
+     * A bar at the bottom of a card is easy to miss and easy to click past,
+     * so while a job runs the screen belongs to the job: everything behind is
+     * covered, nothing behind can be clicked, and the tab key cannot reach it.
+     *
+     * It closes itself the moment the job finishes. On a failure it stays,
+     * because the error is the thing to read -- but it grows a Close button
+     * then, so a job that dies never leaves anybody trapped.
+     */
+    var jobOverlay = (function () {
+        var overlay = null;
+        var bar = null;
+        var status = null;
+        var actions = null;
+        var returnFocusTo = null;
+
+        function onKey(event) {
+            if ('Tab' !== event.key && 9 !== event.keyCode) { return; }
+
+            var focusable = overlay.querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])');
+
+            // Nothing to land on while the job runs, so the key does nothing
+            // at all rather than moving focus behind the overlay.
+            if (!focusable.length) {
+                event.preventDefault();
+                return;
+            }
+
+            var first = focusable[0];
+            var last = focusable[focusable.length - 1];
+
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        }
+
+        function close() {
+            if (!overlay) { return; }
+
+            document.removeEventListener('keydown', onKey, true);
+            if (overlay.parentNode) { overlay.parentNode.removeChild(overlay); }
+            document.body.classList.remove('owpm-modal-open');
+            overlay = null;
+            bar = null;
+            status = null;
+            actions = null;
+
+            if (returnFocusTo && document.contains(returnFocusTo)) {
+                returnFocusTo.focus();
+            }
+
+            returnFocusTo = null;
+        }
+
+        return {
+            open: function (title) {
+                if (overlay) { return; }
+
+                returnFocusTo = document.activeElement;
+
+                overlay = document.createElement('div');
+                overlay.className = 'owpm-modal-overlay owpm-job-overlay';
+                overlay.innerHTML =
+                    '<div class="owpm-modal owpm-job-modal" role="dialog" aria-modal="true" ' +
+                    'aria-labelledby="owpm-job-title">' +
+                    '<h2 id="owpm-job-title">' + esc(title || S.jobRunning || 'Working…') + '</h2>' +
+                    '<div class="owpm-progress-wrapper"><div class="owpm-progress-bar" ' +
+                    'role="progressbar" aria-valuemin="0" aria-valuemax="100"></div></div>' +
+                    '<p class="owpm-job-status" aria-live="polite"></p>' +
+                    '<p class="owpm-job-warning">' +
+                    esc(S.jobDontClose || 'Leave this page open. Closing or reloading it stops the job part way through.') +
+                    '</p>' +
+                    '<div class="owpm-job-actions"></div>' +
+                    '</div>';
+
+                document.body.appendChild(overlay);
+                document.body.classList.add('owpm-modal-open');
+
+                bar = overlay.querySelector('.owpm-progress-bar');
+                status = overlay.querySelector('.owpm-job-status');
+                actions = overlay.querySelector('.owpm-job-actions');
+
+                // Nothing behind the overlay can be reached with the keyboard.
+                document.addEventListener('keydown', onKey, true);
+                overlay.querySelector('.owpm-job-modal').setAttribute('tabindex', '-1');
+                overlay.querySelector('.owpm-job-modal').focus();
+            },
+
+            set: function (percent, message, detail) {
+                if (!overlay) { return; }
+
+                var value = Math.max(0, Math.min(100, percent));
+
+                bar.style.width = value + '%';
+                bar.setAttribute('aria-valuenow', String(Math.round(value)));
+                status.innerHTML = esc(message) +
+                    (detail ? '<span class="owpm-detail">' + esc(detail) + '</span>' : '');
+            },
+
+            fail: function (message) {
+                if (!overlay) { return; }
+
+                bar.classList.add('owpm-progress-error');
+                status.innerHTML = '<span class="owpm-error">' + esc(message) + '</span>';
+                overlay.querySelector('.owpm-job-warning').textContent = '';
+
+                // Only now is there anything to click: a job that has stopped
+                // must never leave somebody with a screen they cannot leave.
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'owpm-btn owpm-btn-secondary';
+                button.textContent = S.modalClose || 'Close';
+                button.addEventListener('click', close);
+                actions.appendChild(button);
+                button.focus();
+            },
+
+            close: close
+        };
+    }());
+
     function ui(prefix) {
         var wrapper = document.getElementById(prefix + '-progress-wrapper');
         var bar = document.getElementById(prefix + '-progress-bar');
         var text = document.getElementById(prefix + '-status-text');
 
+        // The inline bar stays: it is what the finished result is written
+        // into, and it is what remains on screen once the overlay has gone.
         return {
-            show: function () {
+            show: function (title) {
                 if (wrapper) { wrapper.style.display = 'block'; }
                 if (text) { text.style.display = 'block'; }
+                jobOverlay.open(title);
             },
             set: function (percent, message, detail) {
                 if (bar) { bar.style.width = Math.max(0, Math.min(100, percent)) + '%'; }
+                jobOverlay.set(percent, message, detail);
                 if (!text) { return; }
                 text.innerHTML = esc(message) +
                     (detail ? '<span class="owpm-detail">' + esc(detail) + '</span>' : '');
             },
             html: function (markup) {
+                // The result goes on the page, so the overlay has done its job.
+                jobOverlay.close();
                 if (text) { text.innerHTML = markup; }
             },
             done: function () {
+                jobOverlay.close();
                 if (bar) { bar.classList.add('owpm-progress-done'); bar.style.width = '100%'; }
             },
             fail: function (message) {
+                // Stays open, with the error and a way out.
+                jobOverlay.fail(message);
                 if (bar) { bar.classList.add('owpm-progress-error'); }
                 if (text) { text.innerHTML = '<span class="owpm-error">' + esc(message) + '</span>'; }
             }
@@ -472,7 +610,7 @@
      *                       build an archive and each now has its own controls.
      */
     function runExport(view, scope) {
-        view.show();
+        view.show(S.jobExport || 'Building the backup');
         view.set(2, 'Scanning site…');
 
         return post('owpm_start_export', { slim: slimChoices(scope).join(',') }).then(function (start) {
@@ -889,7 +1027,7 @@
         var view = ui('import');
 
         if (dropZone) { dropZone.style.display = 'none'; }
-        view.show();
+        view.show(S.jobImport || 'Restoring this site');
 
         var chunkSize = Number(owpm_ajax.chunk_size) || (2 * 1024 * 1024);
         var totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
@@ -1030,7 +1168,7 @@
 
             var view = ui('pull');
             pullBtn.disabled = true;
-            view.show();
+            view.show(S.jobPull || 'Transferring the site');
             view.set(3, 'Connecting to the source site…');
 
             // The download is a single long request rather than a chain of
@@ -1192,7 +1330,7 @@
 
             var view = ui('domain');
             domainBtn.disabled = true;
-            view.show();
+            view.show(S.jobDomain || 'Changing the address');
             view.set(3, 'Preparing…');
 
             return post('owpm_domain_start', { new_url: value }).then(function (start) {
@@ -1541,14 +1679,27 @@
                 rollbackBtn.disabled = true;
                 rollbackBtn.textContent = S.rollbackRunning || 'Restoring…';
 
+                // Putting the site back is the longest and least interruptible
+                // thing here: it is a database restore with the site part-way
+                // between two states. It had no progress of its own at all,
+                // only a greyed-out button, so this is where leaving the page
+                // did the most damage and said the least about it.
+                jobOverlay.open(S.jobRollback || 'Putting the site back');
+                jobOverlay.set(10, S.rollbackRunning || 'Restoring…');
+                busy.start(S.dontLeave || '');
+
                 post('owpm_rollback', {}).then(function (data) {
+                    busy.stop();
+                    jobOverlay.set(100, (data && data.message) || 'Restored.');
+                    jobOverlay.close();
                     return notify((data && data.message) || 'Restored.');
                 }).then(function () {
                     window.location.reload();
                 }).catch(function (err) {
+                    busy.stop();
+                    jobOverlay.fail(err.message);
                     rollbackBtn.disabled = false;
                     rollbackBtn.textContent = S.rollbackBtn || 'Restore this site';
-                    notify(err.message);
                 });
             });
         });

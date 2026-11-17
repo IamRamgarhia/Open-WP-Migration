@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.6.7
+Stable tag: 1.6.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -240,10 +240,14 @@ host — not a half-finished import you discover later.
 
 == Changelog ==
 
+= 1.6.8 =
+
+* While a job runs, the progress now takes the middle of the screen and the rest of the page is held: an export or an import is a chain of steps driven from the browser, and wandering off part way through is how a site ends up half-restored. It covers every job — export, import, site-to-site transfer, changing the address, and putting a site back from a restore point, which previously showed nothing but a greyed-out button. The panel closes itself when the job ends, and a job that fails grows a Close button so nobody is ever left on a screen they cannot leave.
+* Leaving or reloading the page during one of those now warns first, and the panel says what stopping part way through would cost. Browsers replaced custom wording in that dialog with a generic line years ago, so the specific consequence is said on the page instead.
+
 = 1.6.7 =
 
 * Fixed: a direct site-to-site transfer failed every time, after downloading the whole archive, with "The uploaded backup file could not be found". The destination saved the download under the backup's own id while the import looked for it under a hashed name, so the two never met. The archive now lands where the import reads, and both sides get that path from one function rather than building it separately. This also closes the guessable filename the hashed name exists to prevent.
-* Leaving or reloading the page during an export, an import or a transfer now warns first, and the screen says what stopping part way through would cost. Browsers replaced custom wording in that dialog with a generic line years ago, so the specific consequence is said on the page instead.
 * The restore point taken before every import, the option to leave old clutter behind, and the refusal to import across an incompatible PHP or WordPress version were described only in the changelog. They are now in the description and the FAQ, where somebody deciding whether to install can read them.
 * 1.6.6 was prepared but never published; everything in it is here.
 
