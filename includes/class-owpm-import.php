@@ -1078,7 +1078,11 @@ class OWPM_Import {
 			}
 
 			// Never restore a backup folder on top of the one we are reading from.
-			if ( 0 === strpos( $relative, OWPM_FS::BACKUP_DIR_NAME . '/' ) ) {
+			// stripos, not strpos: on Windows and on a default macOS volume the
+			// filesystem is case-insensitive, so an archive entry spelled
+			// OPEN-MIGRATION-... resolves into the real backup directory and
+			// walks straight past a case-sensitive comparison.
+			if ( 0 === stripos( $relative, OWPM_FS::BACKUP_DIR_NAME . '/' ) ) {
 				return false;
 			}
 
@@ -1126,7 +1130,9 @@ class OWPM_Import {
 		);
 
 		foreach ( $protected as $skip ) {
-			if ( 0 === strpos( $relative, $skip ) || rtrim( $skip, '/' ) === $relative ) {
+			// Case-insensitive for the same reason as above: these paths guard
+			// this plugin's own folder and its working directory.
+			if ( 0 === stripos( $relative, $skip ) || 0 === strcasecmp( rtrim( $skip, '/' ), $relative ) ) {
 				return false;
 			}
 		}

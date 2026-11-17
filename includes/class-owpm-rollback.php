@@ -96,38 +96,146 @@ class OWPM_Rollback {
 		// not loaded at all, so it turned an upload into a fatal error, and it
 		// pointed the filesystem helper at the rollback code that depends on
 		// it rather than the other way round.
-		self::migrate_legacy_parked();
+		self::absorb_legacy_parked();
 
 		return self::current_parked_dir();
 	}
 
-	/** The address itself, with no housekeeping attached. */
+	/**
+	 * The folder itself: whichever one is already there, or a new name.
+	 *
+	 * The name is random and then *found*, never recomputed. The first
+	 * version of this derived it with wp_hash(), which is keyed on the site's
+	 * auth salt -- and anything that rotates that salt renames every file
+	 * this plugin is relying on finding. Rotating salts is standard advice
+	 * after a migration, which is the one thing this plugin exists to do, and
+	 * the plugin's own snapshot briefly parks the options table the salts
+	 * live in. The result would have been a restore point that silently
+	 * stopped existing: the record unreadable, the parked folders invisible
+	 * to restore, discard and the banner, and somebody's only copy of their
+	 * themes and plugins left on disk with no code path able to see it.
+	 *
+	 * That is a worse outcome than the fixed names the Plugins Team objected
+	 * to, which were at least always findable. A name that is written down
+	 * once and looked up afterwards has the same unguessability and none of
+	 * the dependence on a value other software is encouraged to change.
+	 */
 	private static function current_parked_dir() {
-		return OWPM_FS::backup_dir() . 'parked-' . OWPM_FS::secret_name( 'parked' ) . '/';
+		static $dir = null;
+
+		if ( null !== $dir ) {
+			return $dir;
+		}
+
+		$found = glob( OWPM_FS::backup_dir() . 'parked-*', GLOB_ONLYDIR );
+
+		if ( ! empty( $found ) ) {
+			$dir = trailingslashit( $found[0] );
+
+			return $dir;
+		}
+
+		$dir = OWPM_FS::backup_dir() . 'parked-' . wp_generate_password( 32, false ) . '/';
+
+		return $dir;
 	}
 
-	/** The folder this plugin used to park into, before the name was hashed. */
+	/** The folder this plugin used to park into, before the name was random. */
 	private static function legacy_parked_dir() {
 		return OWPM_FS::backup_dir() . self::PARKED_DIR_LEGACY;
 	}
 
 	/**
-	 * Carry anything parked under the old fixed name across to the new one.
+	 * Move anything parked under the old fixed name into the current folder.
 	 *
-	 * Runs once: after the move the old folder is gone, so the is_dir() check
-	 * costs a stat and nothing else.
+	 * Entry by entry rather than renaming the folder wholesale. A wholesale
+	 * rename gave up the moment a current folder already existed, which left
+	 * the older copies both unreachable and still sitting at the predictable
+	 * address this change exists to retire. It also lost everything at once
+	 * if the single rename failed -- and uploads on a separate mount, which
+	 * is ordinary on a host people migrate to, makes rename() fail across
+	 * devices every time.
 	 */
-	public static function migrate_legacy_parked() {
+	private static function absorb_legacy_parked() {
 		$legacy = self::legacy_parked_dir();
 
-		// current_parked_dir(), not parked_dir(): asking the public one here
-		// would call straight back into this function.
-		if ( ! is_dir( $legacy ) || is_dir( self::current_parked_dir() ) ) {
+		if ( ! is_dir( $legacy ) || is_link( untrailingslashit( $legacy ) ) ) {
 			return;
 		}
 
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename, WordPress.PHP.NoSilencedErrors.Discouraged -- same filesystem, same reasoning as park().
-		@rename( $legacy, untrailingslashit( self::current_parked_dir() ) );
+		foreach ( self::PARKED_AREAS as $area ) {
+			$from = $legacy . $area;
+
+			if ( ! is_dir( $from ) ) {
+				continue;
+			}
+
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- an unreadable folder has nothing to take.
+			$entries = @scandir( $from );
+
+			if ( false === $entries ) {
+				continue;
+			}
+
+			$into = self::current_parked_dir() . $area . '/';
+
+			foreach ( $entries as $entry ) {
+				if ( '.' === $entry || '..' === $entry || ! is_dir( $from . '/' . $entry ) ) {
+					continue;
+				}
+
+				// A copy already under the current name is the newer record of
+				// what the site looked like. Never overwrite it.
+				if ( file_exists( $into . $entry ) ) {
+					continue;
+				}
+
+				// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- reported through the move below.
+				if ( ! is_dir( $into ) && ! @wp_mkdir_p( $into ) ) {
+					return;
+				}
+
+				OWPM_FS::protect_dir( self::current_parked_dir() );
+
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename, WordPress.PHP.NoSilencedErrors.Discouraged -- same reasoning as park_file().
+				if ( ! @rename( $from . '/' . $entry, $into . $entry ) ) {
+					// Leave it where it is. Half a restore point that can still
+					// be found by hand beats one this plugin has lost track of.
+					return;
+				}
+			}
+
+			// Emptied, so the predictable address stops existing. rmdir() only
+			// removes an empty directory, so anything that could not be moved
+			// above keeps both its folder and its contents.
+			// rmdir(), not OWPM_FS::delete(): delete() recurses and would take
+			// the contents with it, where the whole safety property here is
+			// that a folder still holding somebody's plugins is left exactly
+			// as it is. WP_Filesystem is avoided for the same reason as in
+			// OWPM_FS::delete() -- it returns false on hosts that want FTP
+			// credentials, and this runs mid-import with nobody to ask.
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir, WordPress.PHP.NoSilencedErrors.Discouraged
+			@rmdir( $from );
+		}
+
+		// Same again for the parent, and for the guard files protect_dir()
+		// left in it -- but only once every area has gone, so a folder still
+		// holding somebody's plugins is never stripped of its deny rules.
+		foreach ( self::PARKED_AREAS as $area ) {
+			if ( is_dir( $legacy . $area ) ) {
+				return;
+			}
+		}
+
+		foreach ( array( '.htaccess', 'web.config', 'index.php', 'index.html' ) as $guard ) {
+			if ( file_exists( $legacy . $guard ) ) {
+				OWPM_FS::delete( $legacy . $guard );
+			}
+		}
+
+		// Empty-only again, so anything still in there keeps the folder.
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir, WordPress.PHP.NoSilencedErrors.Discouraged
+		@rmdir( untrailingslashit( $legacy ) );
 	}
 
 	/**
@@ -150,7 +258,14 @@ class OWPM_Rollback {
 
 		$dir = self::parked_dir() . $area . '/';
 
-		if ( ! wp_mkdir_p( $dir ) ) {
+		// Silenced on purpose. A failure here (permissions, quota, a full disk)
+		// prints the whole path, folder name included, into debug.log -- and
+		// step 3 of the recovery note tells a locked-out operator to switch
+		// debug logging on, at wp-content/debug.log, which is fetchable over
+		// the web on a default install. That is a short road from "the import
+		// failed" to the address of the parked plugins.
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- the false return is handled.
+		if ( ! @wp_mkdir_p( $dir ) ) {
 			return false;
 		}
 
@@ -425,6 +540,23 @@ class OWPM_Rollback {
 		$discard = '';
 		$detail  = self::note_detail_name();
 
+		// Kept as its own value so it can be replaced by the specifics
+		// themselves if the file it points at could not be written.
+		$pointer = "   If you cannot log in, the exact commands for this site -- the table\n"
+			. "   names, the SQL to run in phpMyAdmin, and where your themes and\n"
+			. "   plugins were moved to -- are in another file in this same folder.\n"
+			. "   Its name begins owpm-recovery- and ends .txt.\n\n"
+			. "   That name is deliberately not written down in this file. This\n"
+			. "   folder sits inside uploads, which the web server hands out like any\n"
+			. "   other folder, and the rules meant to keep it private only work on\n"
+			. "   some servers. So the file that names your tables is given a name\n"
+			. "   nobody can guess -- and printing it here would hand it straight to\n"
+			. "   anybody who asked for this file over the web, which is the one\n"
+			. "   thing it has to be protected from.\n\n"
+			. "   You are reading this over FTP or your host's file manager, which\n"
+			. "   lists the folder, so it is sitting right next to this file. Nobody\n"
+			. "   coming in over the web can list it.\n\n";
+
 		// Written as a path relative to the site root, because the only tool
 		// available to someone locked out of wp-admin is an FTP client or the
 		// host's file manager, and both start there.
@@ -472,21 +604,7 @@ class OWPM_Rollback {
 			. "   \"Restore this site\" button on the Import tab. It puts back the\n"
 			. "   database and any themes and plugins that were moved aside, all at\n"
 			. "   once.\n\n"
-			. "   If you cannot log in, the exact commands for this site -- the table\n"
-			. "   names, the SQL to run in phpMyAdmin, and where your themes and\n"
-			. "   plugins were moved to -- are in another file in this same folder.\n"
-			. "   Its name is a long run of letters and numbers ending in .txt, and\n"
-			. "   it is the only file here shaped like that.\n\n"
-			. "   That name is deliberately not written down in this file. This\n"
-			. "   folder sits inside uploads, which the web server hands out like any\n"
-			. "   other folder, and the rules meant to keep it private only work on\n"
-			. "   some servers. So the file that names your tables is given a name\n"
-			. "   nobody can guess -- and printing it here would hand it straight to\n"
-			. "   anybody who asked for this file over the web, which is the one\n"
-			. "   thing it has to be protected from.\n\n"
-			. "   You are reading this over FTP or your host's file manager, which\n"
-			. "   lists the folder, so it is sitting right next to this file. Nobody\n"
-			. "   coming in over the web can list it.\n\n"
+			. $pointer
 			. str_repeat( '=', 64 ) . "\n"
 			. "Docs: https://dicecodes.com/open-migration/\n"
 			. "Support: https://wordpress.org/support/plugin/open-migration-unlimited-site-transfer-backup/\n";
@@ -515,10 +633,29 @@ class OWPM_Rollback {
 			. $discard . "\n"
 			. str_repeat( '=', 64 ) . "\n";
 
+		// The specifics are written FIRST, and the note only points at them if
+		// that worked.
+		//
+		// Both writes used to be fire-and-forget, with the note going first.
+		// The way an import usually dies is the disk filling up, which is also
+		// the way this write usually fails -- so the likeliest single outcome
+		// was a locked-out operator reading a note that sent them to a file
+		// that had never been created, with the table names and the SQL now
+		// nowhere at all. Before the note was split they were in the one file
+		// that did get written.
+		//
+		// If the detail file cannot be written the specifics go back into the
+		// note itself. A note somebody can read over the web is a poor outcome;
+		// a site nobody can put back is a worse one.
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, WordPress.PHP.NoSilencedErrors.Discouraged -- handled on the next line.
+		$wrote_detail = @file_put_contents( $dir . $detail, $details );
+
+		if ( false === $wrote_detail ) {
+			$note = str_replace( $pointer, $details, $note );
+		}
+
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, WordPress.PHP.NoSilencedErrors.Discouraged -- a failed note must not stop the import.
 		@file_put_contents( $dir . self::NOTE_FILE, $note );
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, WordPress.PHP.NoSilencedErrors.Discouraged -- as above.
-		@file_put_contents( $dir . $detail, $details );
 	}
 
 	/**
@@ -788,7 +925,19 @@ class OWPM_Rollback {
 	 * HTTP on any server that ignores .htaccess.
 	 */
 	private static function state_path() {
-		return OWPM_FS::backup_dir() . OWPM_FS::secret_name( 'rollback-state' ) . '.json';
+		static $path = null;
+
+		if ( null !== $path ) {
+			return $path;
+		}
+
+		$found = glob( OWPM_FS::backup_dir() . 'owpm-state-*.json' );
+
+		$path = ( ! empty( $found ) )
+			? $found[0]
+			: OWPM_FS::backup_dir() . 'owpm-state-' . wp_generate_password( 32, false ) . '.json';
+
+		return $path;
 	}
 
 	/** The record's old fixed name, read once so an upgrade mid-import still rolls back. */
@@ -798,7 +947,19 @@ class OWPM_Rollback {
 
 	/** Where the site-specific half of the recovery note lives. */
 	private static function note_detail_name() {
-		return OWPM_FS::secret_name( 'recovery-note' ) . '.txt';
+		static $name = null;
+
+		if ( null !== $name ) {
+			return $name;
+		}
+
+		$found = glob( OWPM_FS::backup_dir() . 'owpm-recovery-*.txt' );
+
+		$name = ( ! empty( $found ) )
+			? basename( $found[0] )
+			: 'owpm-recovery-' . wp_generate_password( 32, false ) . '.txt';
+
+		return $name;
 	}
 
 	/**

@@ -41,28 +41,6 @@ class OWPM_FS {
 	const TIME_LIMIT = 900;
 
 	/**
-	 * An unguessable file or folder name for something that must not be read
-	 * over HTTP.
-	 *
-	 * The backup directory lives under uploads, which is web-served, and the
-	 * guards written into it by protect_dir() are Apache and IIS only. Nginx
-	 * ignores .htaccess entirely, so on that stack the only thing standing
-	 * between a sensitive file and the open web is whether its address can be
-	 * worked out.
-	 *
-	 * wp_hash() is keyed on the site's own salts, so these names cannot be
-	 * derived from the plugin's source the way a fixed name can. Somebody with
-	 * FTP or a file manager still sees them in the directory listing, which is
-	 * the only place they are needed.
-	 *
-	 * @param string $purpose Stable label for the thing being named.
-	 * @return string Hex name, no path and no extension.
-	 */
-	public static function secret_name( $purpose ) {
-		return wp_hash( 'owpm-file|' . (string) $purpose );
-	}
-
-	/**
 	 * Absolute path (trailing slash) of the working/backup directory.
 	 *
 	 * Always resolved through wp_upload_dir() rather than assembled from
@@ -380,8 +358,23 @@ class OWPM_FS {
 
 				// A floor as well as a ceiling: a filter returning 0 would be
 				// read by PHP as "no limit", which is the thing being fixed.
+				$seconds = max( 30, min( 3600, $seconds ) );
+
+				$configured = (int) ini_get( 'max_execution_time' );
+
+				// Never turn a raise into a cut. Two of the callers stream a
+				// whole archive to the browser, so how long they run is set by
+				// the visitor's download speed rather than by any work here; on
+				// a host that already allows longer, or no limit at all,
+				// imposing this number would kill a slow multi-gigabyte
+				// download part way through and hand the far end a truncated
+				// archive.
+				if ( 0 === $configured ) {
+					return;
+				}
+
 				// phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged, WordPress.PHP.NoSilencedErrors.Discouraged
-				@set_time_limit( max( 30, min( 3600, $seconds ) ) );
+				@set_time_limit( max( $configured, $seconds ) );
 			}
 		}
 
