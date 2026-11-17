@@ -214,13 +214,17 @@ class OWPM_Import {
 	 * ------------------------------------------------------------------ */
 
 	public function ajax_upload_chunk() {
+		// No raised limits here. A chunk is two megabytes appended to a file,
+		// which is a normal short request; the default execution limit covers
+		// it many times over. Raising it for this step meant every upload lifted
+		// the site's ceiling for no reason, which is what the Plugins Team
+		// flagged.
 		check_ajax_referer( 'owpm_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( __( 'You do not have permission to do that.', 'open-migration-unlimited-site-transfer-backup' ), 403 );
 		}
 
-		OWPM_FS::raise_limits();
 		OWPM_FS::init_backup_dir();
 
 		$file_id      = $this->request_file_id();

@@ -29,6 +29,40 @@ class OWPM_FS {
 	const EXTERNAL_UPLOADS_ENTRY = 'owpm-uploads';
 
 	/**
+	 * Seconds a single request may run for once limits are raised.
+	 *
+	 * Deliberately a number rather than 0. The work here is already batched --
+	 * a batch yields to the browser after batch_time_budget() seconds -- so
+	 * unlimited execution time was never what kept an export alive; it only
+	 * removed the ceiling that stops a wedged request occupying a worker for
+	 * ever. The ceiling is generous because one indivisible unit of work, such
+	 * as copying a single very large file, can outlast a whole batch budget.
+	 */
+	const TIME_LIMIT = 900;
+
+	/**
+	 * An unguessable file or folder name for something that must not be read
+	 * over HTTP.
+	 *
+	 * The backup directory lives under uploads, which is web-served, and the
+	 * guards written into it by protect_dir() are Apache and IIS only. Nginx
+	 * ignores .htaccess entirely, so on that stack the only thing standing
+	 * between a sensitive file and the open web is whether its address can be
+	 * worked out.
+	 *
+	 * wp_hash() is keyed on the site's own salts, so these names cannot be
+	 * derived from the plugin's source the way a fixed name can. Somebody with
+	 * FTP or a file manager still sees them in the directory listing, which is
+	 * the only place they are needed.
+	 *
+	 * @param string $purpose Stable label for the thing being named.
+	 * @return string Hex name, no path and no extension.
+	 */
+	public static function secret_name( $purpose ) {
+		return wp_hash( 'owpm-file|' . (string) $purpose );
+	}
+
+	/**
 	 * Absolute path (trailing slash) of the working/backup directory.
 	 *
 	 * Always resolved through wp_upload_dir() rather than assembled from
@@ -321,16 +355,33 @@ class OWPM_FS {
 
 	/**
 	 * Give long-running export/import batches the headroom they need.
+	 *
+	 * Only the steps that genuinely need it call this. It used to raise the
+	 * limit to 0 -- no limit at all -- for every step including a two-megabyte
+	 * upload chunk, which is a normal short write that any default limit
+	 * already covers. Removing the ceiling site-wide for work that does not
+	 * need it is what the Plugins Team objected to, and they were right: a
+	 * host that caps execution time does so deliberately, and a wedged request
+	 * with no limit holds a PHP worker until the server kills it.
+	 *
+	 * @param int $seconds Headroom to ask for. Clamped; never unlimited.
 	 */
-	public static function raise_limits() {
+	public static function raise_limits( $seconds = self::TIME_LIMIT ) {
 		if ( function_exists( 'set_time_limit' ) ) {
 			$disabled = explode( ',', (string) ini_get( 'disable_functions' ) );
 			$disabled = array_map( 'trim', $disabled );
 			if ( ! in_array( 'set_time_limit', $disabled, true ) ) {
-				// Export and import batches stream multi-gigabyte archives; without this
-				// a long batch is killed mid-write by max_execution_time.
+				/**
+				 * Filter the per-request execution ceiling for heavy steps.
+				 *
+				 * @param int $seconds Default OWPM_FS::TIME_LIMIT.
+				 */
+				$seconds = (int) apply_filters( 'owpm_time_limit', (int) $seconds );
+
+				// A floor as well as a ceiling: a filter returning 0 would be
+				// read by PHP as "no limit", which is the thing being fixed.
 				// phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged, WordPress.PHP.NoSilencedErrors.Discouraged
-				@set_time_limit( 0 );
+				@set_time_limit( max( 30, min( 3600, $seconds ) ) );
 			}
 		}
 

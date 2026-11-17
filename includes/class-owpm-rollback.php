@@ -44,7 +44,7 @@ class OWPM_Rollback {
 	 * to outlive a fatal error mid-import, which rules out anything in memory.
 	 * The backup directory is already deny-all (see OWPM_FS::protect_dir).
 	 */
-	const STATE_FILE = '.owpm-rollback.json';
+	const STATE_FILE_LEGACY = '.owpm-rollback.json';
 
 	/** MySQL's hard limit on an identifier. */
 	const MAX_TABLE_NAME = 64;
@@ -66,13 +66,68 @@ class OWPM_Rollback {
 	 * between would have left a state file claiming nothing and a pile of the
 	 * operator's plugins in a hidden folder with no way to find out.
 	 */
-	const PARKED_DIR = 'parked/';
+	const PARKED_DIR_LEGACY = 'parked/';
+
+	/** The note anybody locked out of the dashboard is meant to find. */
+	const NOTE_FILE = 'READ-ME-IF-THE-SITE-IS-BROKEN.txt';
 
 	/** Folders a clean install may park. Nothing else is ever moved. */
 	const PARKED_AREAS = array( 'themes', 'plugins' );
 
+	/**
+	 * Where themes and plugins are parked during a clean install.
+	 *
+	 * The name is unguessable because the folders moved in here are whole
+	 * plugins and themes -- executable PHP, under uploads, on a path that was
+	 * previously laid out exactly like the one they came from. Anyone who knew
+	 * a plugin slug knew the address of its code, and the deny rules that were
+	 * supposed to cover it do nothing on Nginx.
+	 */
 	public static function parked_dir() {
-		return OWPM_FS::backup_dir() . self::PARKED_DIR;
+		// Every caller that parks, lists, restores, counts or discards comes
+		// through here, which makes it the one place that can guarantee the
+		// answer is current. A site that parked folders under the old fixed
+		// name still has them sitting there, and they may be the only copy of
+		// somebody's themes and plugins, so they are carried across before
+		// this hands back an address.
+		//
+		// This was first hung off OWPM_FS::init_backup_dir(), which was wrong
+		// twice over: that function runs on request paths where this class is
+		// not loaded at all, so it turned an upload into a fatal error, and it
+		// pointed the filesystem helper at the rollback code that depends on
+		// it rather than the other way round.
+		self::migrate_legacy_parked();
+
+		return self::current_parked_dir();
+	}
+
+	/** The address itself, with no housekeeping attached. */
+	private static function current_parked_dir() {
+		return OWPM_FS::backup_dir() . 'parked-' . OWPM_FS::secret_name( 'parked' ) . '/';
+	}
+
+	/** The folder this plugin used to park into, before the name was hashed. */
+	private static function legacy_parked_dir() {
+		return OWPM_FS::backup_dir() . self::PARKED_DIR_LEGACY;
+	}
+
+	/**
+	 * Carry anything parked under the old fixed name across to the new one.
+	 *
+	 * Runs once: after the move the old folder is gone, so the is_dir() check
+	 * costs a stat and nothing else.
+	 */
+	public static function migrate_legacy_parked() {
+		$legacy = self::legacy_parked_dir();
+
+		// current_parked_dir(), not parked_dir(): asking the public one here
+		// would call straight back into this function.
+		if ( ! is_dir( $legacy ) || is_dir( self::current_parked_dir() ) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename, WordPress.PHP.NoSilencedErrors.Discouraged -- same filesystem, same reasoning as park().
+		@rename( $legacy, untrailingslashit( self::current_parked_dir() ) );
 	}
 
 	/**
@@ -368,6 +423,7 @@ class OWPM_Rollback {
 
 		$restore = '';
 		$discard = '';
+		$detail  = self::note_detail_name();
 
 		// Written as a path relative to the site root, because the only tool
 		// available to someone locked out of wp-admin is an FTP client or the
@@ -411,33 +467,52 @@ class OWPM_Rollback {
 			. "       define( 'WP_DEBUG_LOG', true );\n"
 			. "       define( 'WP_DEBUG_DISPLAY', false );\n\n"
 			. "   Reload the site once, then read wp-content/debug.log.\n\n"
-			. "4. PUT THE DATABASE BACK AS IT WAS\n"
-			. "   This import parked your original tables rather than deleting them.\n"
-			. '   They are still there, under the prefix "' . self::PREFIX . "\".\n\n"
+			. "4. PUTTING THE DATABASE, THEMES AND PLUGINS BACK\n"
 			. "   Easiest way: log in to wp-admin, open Open Migration, and use the\n"
-			. "   \"Restore this site\" button on the Import tab.\n\n"
-			. "   If you cannot log in, open phpMyAdmin (or Adminer) on this database,\n"
-			. "   go to the SQL tab, and run exactly this:\n\n"
-			. $restore . "\n"
-			. "   That deletes what the import created and moves your original tables\n"
-			. "   back. Take a database export first if you can -- it costs a minute\n"
-			. "   and this step cannot be undone.\n\n"
-			. "5. YOUR THEMES AND PLUGINS, IF YOU CHOSE \"CLEAN INSTALL\"\n"
-			. "   They were moved aside, not deleted. They are in:\n\n"
-			. '       ' . $parked_path . "\n\n"
-			. "   Inside that you will find themes/ and plugins/, each holding the\n"
-			. "   folders as they were. To put one back by hand, move its folder into\n"
-			. "   wp-content/themes or wp-content/plugins. The \"Restore this site\"\n"
-			. "   button does all of them at once if you can reach wp-admin.\n\n"
-			. "6. WHEN EVERYTHING IS FINE AGAIN\n"
-			. "   The parked copies are only taking up space. Remove them with:\n\n"
-			. $discard . "\n"
+			. "   \"Restore this site\" button on the Import tab. It puts back the\n"
+			. "   database and any themes and plugins that were moved aside, all at\n"
+			. "   once.\n\n"
+			. "   If you cannot log in, the exact commands for this site -- the table\n"
+			. "   names, the SQL to run in phpMyAdmin, and where your themes and\n"
+			. "   plugins were moved to -- are in this file, in this same folder:\n\n"
+			. '       ' . $detail . "\n\n"
+			. "   It is named that way on purpose. This folder sits inside uploads,\n"
+			. "   which is served to the web, and the rules that are supposed to keep\n"
+			. "   it private only work on some servers. A name nobody can guess works\n"
+			. "   on all of them. You are reading this over FTP or a file manager, so\n"
+			. "   the file is right there in the listing.\n\n"
 			. str_repeat( '=', 64 ) . "\n"
 			. "Docs: https://dicecodes.com/open-migration/\n"
 			. "Support: https://wordpress.org/support/plugin/open-migration-unlimited-site-transfer-backup/\n";
 
+		// The half that names tables and paths. Same folder, unguessable name.
+		$details = "OPEN MIGRATION - THE EXACT COMMANDS FOR THIS SITE\n"
+			. 'Written ' . gmdate( 'Y-m-d H:i:s' ) . " UTC, when an import started.\n"
+			. str_repeat( '=', 64 ) . "\n\n"
+			. "1. PUT THE DATABASE BACK AS IT WAS\n"
+			. "   This import parked your original tables rather than deleting them.\n"
+			. '   They are still there, under the prefix "' . self::PREFIX . "\".\n\n"
+			. "   Open phpMyAdmin (or Adminer) on this database, go to the SQL tab,\n"
+			. "   and run exactly this:\n\n"
+			. $restore . "\n"
+			. "   That deletes what the import created and moves your original tables\n"
+			. "   back. Take a database export first if you can -- it costs a minute\n"
+			. "   and this step cannot be undone.\n\n"
+			. "2. YOUR THEMES AND PLUGINS, IF YOU CHOSE \"CLEAN INSTALL\"\n"
+			. "   They were moved aside, not deleted. They are in:\n\n"
+			. '       ' . $parked_path . "\n\n"
+			. "   Inside that you will find themes/ and plugins/, each holding the\n"
+			. "   folders as they were. To put one back by hand, move its folder into\n"
+			. "   wp-content/themes or wp-content/plugins.\n\n"
+			. "3. WHEN EVERYTHING IS FINE AGAIN\n"
+			. "   The parked copies are only taking up space. Remove them with:\n\n"
+			. $discard . "\n"
+			. str_repeat( '=', 64 ) . "\n";
+
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, WordPress.PHP.NoSilencedErrors.Discouraged -- a failed note must not stop the import.
-		@file_put_contents( $dir . 'READ-ME-IF-THE-SITE-IS-BROKEN.txt', $note );
+		@file_put_contents( $dir . self::NOTE_FILE, $note );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, WordPress.PHP.NoSilencedErrors.Discouraged -- as above.
+		@file_put_contents( $dir . $detail, $details );
 	}
 
 	/**
@@ -485,7 +560,8 @@ class OWPM_Rollback {
 		$count = self::rename_back( $snapshot['tables'] );
 
 		self::clear_state();
-		OWPM_FS::delete( OWPM_FS::backup_dir() . 'READ-ME-IF-THE-SITE-IS-BROKEN.txt' );
+		OWPM_FS::delete( OWPM_FS::backup_dir() . self::NOTE_FILE );
+		OWPM_FS::delete( OWPM_FS::backup_dir() . self::note_detail_name() );
 
 		// The options table has just been swapped underneath us, so anything read
 		// earlier in this request is stale.
@@ -538,7 +614,8 @@ class OWPM_Rollback {
 
 		// The recovery note describes tables that no longer exist. Leaving it
 		// would send someone to phpMyAdmin to run SQL against nothing.
-		OWPM_FS::delete( OWPM_FS::backup_dir() . 'READ-ME-IF-THE-SITE-IS-BROKEN.txt' );
+		OWPM_FS::delete( OWPM_FS::backup_dir() . self::NOTE_FILE );
+		OWPM_FS::delete( OWPM_FS::backup_dir() . self::note_detail_name() );
 
 		return $dropped;
 	}
@@ -697,8 +774,25 @@ class OWPM_Rollback {
 	/**
 	 * Path of the snapshot record.
 	 */
+	/**
+	 * Where the rollback record lives.
+	 *
+	 * Unguessable for the same reason as everything else in here: it names the
+	 * site's database tables, and a fixed name under uploads is readable over
+	 * HTTP on any server that ignores .htaccess.
+	 */
 	private static function state_path() {
-		return OWPM_FS::backup_dir() . self::STATE_FILE;
+		return OWPM_FS::backup_dir() . OWPM_FS::secret_name( 'rollback-state' ) . '.json';
+	}
+
+	/** The record's old fixed name, read once so an upgrade mid-import still rolls back. */
+	private static function legacy_state_path() {
+		return OWPM_FS::backup_dir() . self::STATE_FILE_LEGACY;
+	}
+
+	/** Where the site-specific half of the recovery note lives. */
+	private static function note_detail_name() {
+		return OWPM_FS::secret_name( 'recovery-note' ) . '.txt';
 	}
 
 	/**
@@ -718,7 +812,16 @@ class OWPM_Rollback {
 		$path = self::state_path();
 
 		if ( ! file_exists( $path ) ) {
-			return false;
+			// An import that began before this plugin was updated wrote the
+			// record under the old fixed name. It is the only description of
+			// where that site's tables went, so it is still read.
+			$legacy = self::legacy_state_path();
+
+			if ( ! file_exists( $legacy ) ) {
+				return false;
+			}
+
+			$path = $legacy;
 		}
 
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents, WordPress.PHP.NoSilencedErrors.Discouraged -- a missing or unreadable file means no snapshot.
@@ -770,6 +873,7 @@ class OWPM_Rollback {
 
 	private static function clear_state() {
 		OWPM_FS::delete( self::state_path() );
+		OWPM_FS::delete( self::legacy_state_path() );
 	}
 
 	/**
