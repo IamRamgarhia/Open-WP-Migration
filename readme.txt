@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.6.6
+Stable tag: 1.6.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -240,10 +240,12 @@ host — not a half-finished import you discover later.
 
 == Changelog ==
 
-= 1.6.6 =
+= 1.6.7 =
 
-* Documentation only; the plugin itself is unchanged from 1.6.5.
+* Fixed: a direct site-to-site transfer failed every time, after downloading the whole archive, with "The uploaded backup file could not be found". The destination saved the download under the backup's own id while the import looked for it under a hashed name, so the two never met. The archive now lands where the import reads, and both sides get that path from one function rather than building it separately. This also closes the guessable filename the hashed name exists to prevent.
+* Leaving or reloading the page during an export, an import or a transfer now warns first, and the screen says what stopping part way through would cost. Browsers replaced custom wording in that dialog with a generic line years ago, so the specific consequence is said on the page instead.
 * The restore point taken before every import, the option to leave old clutter behind, and the refusal to import across an incompatible PHP or WordPress version were described only in the changelog. They are now in the description and the FAQ, where somebody deciding whether to install can read them.
+* 1.6.6 was prepared but never published; everything in it is here.
 
 = 1.6.5 =
 * Security: the browser no longer decides where anything is stored on disk. The uploaded archive, its working directory and the import session file were all named from an identifier the browser chose — a timestamp plus Math.random() — so anyone who worked out that name could fetch the archive, the database dump inside the working directory, or the session file that names the archive's path. The deny rules this plugin writes are Apache and IIS only, so on Nginx nothing else stopped them. Those names are now derived server-side with wp_hash(), keyed on the site's own salts, and the browser's identifier is generated from crypto.getRandomValues().

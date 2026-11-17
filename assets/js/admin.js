@@ -24,6 +24,63 @@
     var S = owpm_ajax.i18n || {};
 
     /* ------------------------------------------------------------------ */
+    /* Leaving in the middle of a job                                     */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Whether a job is running that a page load would abandon.
+     *
+     * An export or an import is a chain of short AJAX steps driven from this
+     * page. Closing the tab or hitting reload stops the chain where it is:
+     * an export leaves a half-written archive, and an import leaves the site
+     * part-restored, which is the worse of the two by a long way.
+     *
+     * The browser will not show our words -- every engine replaced custom
+     * beforeunload text with its own generic line years ago, because the
+     * feature was abused. What we can do is make sure the dialog appears at
+     * all, and say the specific thing on the page itself, where there is room
+     * for it.
+     */
+    var busy = (function () {
+        var depth = 0;
+        var note = null;
+
+        function guard(event) {
+            if (depth < 1) { return undefined; }
+
+            // Both forms: the modern one and the one older engines want.
+            event.preventDefault();
+            event.returnValue = '';
+
+            return '';
+        }
+
+        window.addEventListener('beforeunload', guard);
+
+        return {
+            start: function (message) {
+                depth += 1;
+
+                if (depth === 1 && message) {
+                    note = document.createElement('p');
+                    note.className = 'owpm-leaving-warning';
+                    note.setAttribute('role', 'status');
+                    note.textContent = message;
+                    root.insertBefore(note, root.firstChild);
+                }
+            },
+            stop: function () {
+                depth = Math.max(0, depth - 1);
+
+                if (depth === 0 && note && note.parentNode) {
+                    note.parentNode.removeChild(note);
+                    note = null;
+                }
+            }
+        };
+    }());
+
+    /* ------------------------------------------------------------------ */
     /* Helpers                                                            */
     /* ------------------------------------------------------------------ */
 
@@ -243,7 +300,21 @@
 
     /** Repeat a batched action until the server reports status "complete". */
     function runUntilComplete(action, payload, onProgress) {
+        // Every multi-step job comes through here, so this is the one place
+        // that has to know a job is running.
+        busy.start(S.dontLeave || 'This is running now. Leaving or reloading this page stops it part way through.');
+
         return new Promise(function (resolve, reject) {
+            function finish(fn) {
+                return function (value) {
+                    busy.stop();
+                    fn(value);
+                };
+            }
+
+            resolve = finish(resolve);
+            reject = finish(reject);
+
             function tick() {
                 post(action, payload).then(function (data) {
                     if (typeof onProgress === 'function') {
@@ -962,12 +1033,18 @@
             view.show();
             view.set(3, 'Connecting to the source site…');
 
+            // The download is a single long request rather than a chain of
+            // steps, so it is bracketed here instead of in runUntilComplete.
+            busy.start(S.dontLeavePull || 'The archive is downloading now. Leaving or reloading this page stops the transfer, and it has to start again from the beginning.');
+
             return post('owpm_pull_site', { token: token }).then(function (data) {
+                busy.stop();
                 view.set(35, 'Downloaded ' + data.size + '. Restoring…');
                 return runImportSteps(data.file_id, view, 35, 'pull');
             }).then(function (result) {
                 renderImportResult(view, result);
             }).catch(function (err) {
+                busy.stop();
                 view.fail(err.message);
                 pullBtn.disabled = false;
             });

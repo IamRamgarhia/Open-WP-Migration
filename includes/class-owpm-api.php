@@ -265,8 +265,16 @@ class OWPM_API {
 
 		$dir = OWPM_FS::init_backup_dir();
 
-		// backup_id is now guaranteed to be [A-Za-z0-9_-] only, so it cannot escape $dir.
-		$local_file = $dir . $backup_id . '.zip';
+		// The same name the import will look for, which is a hash of the id
+		// rather than the id itself.
+		//
+		// This used to be $dir . $backup_id . '.zip', which broke the whole
+		// feature: the download succeeded and then the import, which looks
+		// under OWPM_Import::storage_slug(), reported that the backup file
+		// could not be found. It also put a guessable name back in the
+		// uploads directory, which is the thing the hashed name exists to
+		// prevent on servers where the deny rules do not apply.
+		$local_file = OWPM_Import::archive_path( $backup_id );
 
 		if ( ! OWPM_FS::is_inside( $local_file, $dir ) ) {
 			wp_send_json_error( __( 'Invalid download target.', 'open-migration-unlimited-site-transfer-backup' ) );

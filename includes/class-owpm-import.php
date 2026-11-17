@@ -90,13 +90,41 @@ class OWPM_Import {
 	 * wp_hash() is keyed on the site's own salts, so the on-disk name cannot be
 	 * derived from the id. The id stays as the handle the browser passes back
 	 * and forth; it simply no longer decides where anything lands.
+	 *
+	 * Public and static because the pull transfer has to land its download in
+	 * the same place this class will look for it. It was writing the archive
+	 * under the plain backup id instead, so the import that ran next could
+	 * never find the file, and a site-to-site transfer failed every time with
+	 * "The uploaded backup file could not be found" -- after downloading the
+	 * whole archive. One function, called from both sides, is what stops the
+	 * two drifting apart again.
+	 *
+	 * @param string $file_id The handle the browser passes around.
+	 * @return string The on-disk name, without a path or an extension.
 	 */
-	private function storage_slug( $file_id ) {
+	public static function storage_slug( $file_id ) {
 		return wp_hash( 'owpm-import|' . (string) $file_id );
 	}
 
+	/**
+	 * The full path of an incoming archive.
+	 *
+	 * The one place that answers "where does the archive for this id live".
+	 * The uploader writes here, the pull transfer writes here, and the import
+	 * reads here, so there is no second expression to fall out of step with
+	 * the first -- which is exactly what happened: the pull transfer built its
+	 * own path from the plain id, downloaded a 568 MB archive into it, and
+	 * handed the id to an import that looked somewhere else entirely.
+	 *
+	 * @param string $file_id The handle the browser passes around.
+	 * @return string Absolute path.
+	 */
+	public static function archive_path( $file_id ) {
+		return OWPM_FS::backup_dir() . self::storage_slug( $file_id ) . '.zip';
+	}
+
 	private function session_path( $file_id ) {
-		return $this->temp_dir . '.owpm-session-' . $this->storage_slug( $file_id ) . '.json';
+		return $this->temp_dir . '.owpm-session-' . self::storage_slug( $file_id ) . '.json';
 	}
 
 	private function read_session( $file_id ) {
@@ -222,7 +250,7 @@ class OWPM_Import {
 			wp_send_json_error( __( 'The uploaded chunk could not be verified.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
-		$file_path = $this->temp_dir . $this->storage_slug( $file_id ) . '.zip';
+		$file_path = self::archive_path( $file_id );
 
 		if ( ! OWPM_FS::is_inside( $file_path, $this->temp_dir ) ) {
 			wp_send_json_error( __( 'Invalid upload target.', 'open-migration-unlimited-site-transfer-backup' ) );
@@ -306,7 +334,7 @@ class OWPM_Import {
 			wp_send_json_error( __( 'Invalid import identifier.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
-		$zip_path = $this->temp_dir . $this->storage_slug( $file_id ) . '.zip';
+		$zip_path = self::archive_path( $file_id );
 
 		if ( ! file_exists( $zip_path ) || ! OWPM_FS::is_inside( $zip_path, $this->temp_dir ) ) {
 			wp_send_json_error( __( 'The uploaded backup file could not be found.', 'open-migration-unlimited-site-transfer-backup' ) );
@@ -343,7 +371,7 @@ class OWPM_Import {
 			wp_send_json_error( __( 'This backup came from a multisite network, which is not supported yet.', 'open-migration-unlimited-site-transfer-backup' ) );
 		}
 
-		$work_dir = $this->temp_dir . $this->storage_slug( $file_id ) . '-work';
+		$work_dir = $this->temp_dir . self::storage_slug( $file_id ) . '-work';
 		OWPM_FS::delete( $work_dir );
 		wp_mkdir_p( $work_dir );
 

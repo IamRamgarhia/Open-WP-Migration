@@ -278,6 +278,13 @@ class OWPM_Admin {
 			'multisite'          => __( 'Multisite networks are not supported yet.', 'open-migration-unlimited-site-transfer-backup' ),
 			'notZip'             => __( 'Please choose a .zip backup file.', 'open-migration-unlimited-site-transfer-backup' ),
 			'noToken'            => __( 'Please paste a migration token.', 'open-migration-unlimited-site-transfer-backup' ),
+
+			// Shown on the page while a job runs. The browser's own reload
+			// warning cannot carry our words -- every engine replaced custom
+			// text with a generic line -- so the specific consequence is said
+			// here, where there is room for it.
+			'dontLeave'          => __( 'This is running now. Leaving or reloading this page stops it part way through.', 'open-migration-unlimited-site-transfer-backup' ),
+			'dontLeavePull'      => __( 'The archive is downloading now. Leaving or reloading this page stops the transfer, and it has to start again from the beginning.', 'open-migration-unlimited-site-transfer-backup' ),
 			'noDomain'           => __( 'Please enter the new site address.', 'open-migration-unlimited-site-transfer-backup' ),
 			'continueAnyway'     => __( 'Continue with the import anyway?', 'open-migration-unlimited-site-transfer-backup' ),
 			'importCancelled'    => __( 'Import cancelled.', 'open-migration-unlimited-site-transfer-backup' ),

@@ -1537,3 +1537,20 @@ body.owpm-modal-open { overflow: hidden; }
 		width: 100%;
 	}
 }
+
+/* Shown while an export, import or transfer is running.
+ *
+ * The browser's own reload prompt cannot carry our words -- every engine
+ * replaced custom beforeunload text with a generic line -- so the specific
+ * consequence is said here, at the top of the screen, where there is room
+ * for it. It is removed when the job ends, successfully or not.
+ */
+.owpm-leaving-warning {
+	margin: 0 0 16px;
+	padding: 12px 16px;
+	border-left: 4px solid #d63638;
+	background: #fcf0f1;
+	color: #1d2327;
+	font-weight: 600;
+	border-radius: 2px;
+}
