@@ -4,7 +4,7 @@ Tags: migration, backup, clone, transfer, restore
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.6.9
+Stable tag: 1.6.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -240,6 +240,10 @@ host — not a half-finished import you discover later.
 
 == Changelog ==
 
+= 1.6.10 =
+
+* The recovery note has one fallback, used when the file holding this site's exact commands cannot be written -- a full disk, usually, which is also a common way an import dies in the first place. That fallback copied the table names, the prefix, the SQL and the folder path into the note itself, which is the one file in there anybody can fetch: in the one situation where somebody is already having a bad day, it undid the whole of 1.6.9. It now explains both steps without naming anything specific to the site. Nothing is lost by that, because what it needs to say is already public either way: the prefix it tells you to look for is a fixed string in this plugin's source, and anybody at a phpMyAdmin window or an FTP listing can see which tables and which folder it points at on their own site. The shorter note is also likelier to be written at all, which is the point when the disk is what failed.
+
 = 1.6.9 =
 
 Addresses everything raised in the Plugins Team review of 17 November 2026.
@@ -253,182 +257,7 @@ Addresses everything raised in the Plugins Team review of 17 November 2026.
 
 * While a job runs, the progress now takes the middle of the screen and the rest of the page is held: an export or an import is a chain of steps driven from the browser, and wandering off part way through is how a site ends up half-restored. It covers every job — export, import, site-to-site transfer, changing the address, and putting a site back from a restore point, which previously showed nothing but a greyed-out button. The panel closes itself when the job ends, and a job that fails grows a Close button so nobody is ever left on a screen they cannot leave.
 * Leaving or reloading the page during one of those now warns first, and the panel says what stopping part way through would cost. Browsers replaced custom wording in that dialog with a generic line years ago, so the specific consequence is said on the page instead.
-
-= 1.6.7 =
-
-* Fixed: a direct site-to-site transfer failed every time, after downloading the whole archive, with "The uploaded backup file could not be found". The destination saved the download under the backup's own id while the import looked for it under a hashed name, so the two never met. The archive now lands where the import reads, and both sides get that path from one function rather than building it separately. This also closes the guessable filename the hashed name exists to prevent.
-* The restore point taken before every import, the option to leave old clutter behind, and the refusal to import across an incompatible PHP or WordPress version were described only in the changelog. They are now in the description and the FAQ, where somebody deciding whether to install can read them.
-* 1.6.6 was prepared but never published; everything in it is here.
-
-= 1.6.5 =
-* Security: the browser no longer decides where anything is stored on disk. The uploaded archive, its working directory and the import session file were all named from an identifier the browser chose — a timestamp plus Math.random() — so anyone who worked out that name could fetch the archive, the database dump inside the working directory, or the session file that names the archive's path. The deny rules this plugin writes are Apache and IIS only, so on Nginx nothing else stopped them. Those names are now derived server-side with wp_hash(), keyed on the site's own salts, and the browser's identifier is generated from crypto.getRandomValues().
-* Fixed: the execution time limit was being lifted for every action on the Export and Change Domain tabs, including listing backups and checking DNS — routine work that finishes in milliseconds, and no reason to take a site outside the limits its host has set. It is now raised only by the operations that stream archives or walk every table.
-* Fixed: a new site address had its scheme, host and port validated but its path accepted exactly as typed, then stored in siteurl and home and echoed back in the DNS check response. The path is now validated as a plain subdirectory and the result passes through esc_url_raw(), and both entry points sanitise the submitted value rather than only unslashing it.
-
-= 1.6.4 =
-* Fixed: the slim-down selection arriving from the browser was unslashed but never sanitised. It was already reduced to a fixed list of known keys before any SQL was built, so nothing could be injected through it, but the value is now run through sanitize_text_field() on the way in as well.
-* The ten warnings WordPress.org's Plugin Check reports are now zero. Nine were table and index names being written straight into statements that cannot take a bound parameter — prepare() binds values, not identifiers — where the names are validated and backticked first and never come from a request. Each now says so at the point it happens, rather than leaving a reader to work it out.
-
-= 1.6.3 =
-* Changed: "Build Backup & Generate Token" is now a solid button like "Start Pull Transfer". Both are the one action of their step and they run on different machines, so outlining the first made half the job look optional. Both also have room above them instead of sitting flush against the panel above, and go full width on a phone.
-
-= 1.6.2 =
-* Changed: the slim-down options are now a collapsed section rather than four checkboxes and a paragraph each sitting between you and the Export button. The summary shows how many are ticked, so a choice made there is still visible once it is shut.
-* Fixed: inside the coloured Site-to-Site boxes every checkbox and radio sat on a line of its own, because a rule for labels in those boxes overrode the one laying them out. The options and the keep/clean-install choice now read the same everywhere.
-* Fixed: the clean-install warning was shown permanently, including under "Keep them (recommended)" where it describes a risk you have not taken. An author style was overriding the browser's own handling of the hidden attribute.
-
-= 1.6.1 =
-* Fixed: while an import held the restore point, the dashboard redirected to upgrade.php and WordPress loaded no plugins at all — including this one. So the page carrying the "Restore this site" button could not be opened during the one window it exists for, and an import whose database dump needed more than one request had no handler left to continue with. The stand-in options table now also carries db_version and an active_plugins list holding only this plugin, so the dashboard loads and no third-party code runs against a half-restored database.
-* Fixed: a restore point made only of moved-aside files reported "0 database table(s), 56 years ago" on the Import tab and in the Verify check — a zero timestamp measured from the epoch. Both now describe what is actually held, and say that the database was never reached.
-
-= 1.6.0 =
-* Added: the Site-to-Site tab now carries the same options as the tabs it mirrors — the slim-down choices on the step that builds the archive, and the keep/clean-install choice on the step that restores it. Each tab's controls are its own: previously a site-to-site transfer silently used whatever was ticked over on the Export tab, which is not somewhere you would think to look.
-* Fixed: a site served on a non-standard port — localhost:8099, or staging behind one — listed its own domain as a foreign one in the Verify tab, because the port was compared against a host name with the port stripped. Pressing the rewrite button on it would then have removed the port from every protocol-relative link on the site.
-* Added: optional "Slim down the backup" on the Export tab — leave post revisions, trashed and abandoned items, spam comments and orphaned metadata out of the archive for a smaller file and a tidier import. It tells you how many rows each option would leave out before you start, counted rather than estimated. This only changes what gets copied: the site being exported is read and never written, so a box ticked by mistake gives you a smaller backup and nothing worse.
-* Added: the Verify tab now lists each other domain your content links to as its own row, with a few of the pages it appears on and a button that rewrites those links to point here. Before this the tab could only tell you the old address was still in your content; the advice it gave was to use the Change Domain tab, which rewrites *away from* this site's address and so could not fix it. The one thing it told you to do was the one thing that could not work.
-* Added: the rewrite counts what it would change and shows you the real number before it runs, names the tables it cannot fix automatically rather than reporting success over them, and re-checks the database afterwards instead of assuming it worked.
-* Added: an import is now refused, rather than warned about, when carrying on would break the site — a database from a newer WordPress than this site runs (WordPress upgrades a database but never downgrades one), a source PHP a whole major version ahead of this server, or less free disk than the archive needs to unpack. The refusal explains the remedy, including where to change PHP version in cPanel, Plesk and hPanel. It is enforced on the server, so skipping the dialog changes nothing.
-* Added: "Clean install" no longer deletes your themes and plugins. They are moved aside and held as part of the restore point, so "Restore this site" puts them back; they are removed for good only once the import has finished successfully. Previously they were deleted outright, which meant the snapshot covered the database alone and a rollback handed back settings naming plugins that no longer existed on disk.
-* Fixed: "Restore this site" now also puts the site into a state that can boot — anything the restored database points at that is no longer on disk is corrected, which only the end of a successful import used to do. It also says what it did and did not recover instead of claiming the site is "back as it was".
-* Fixed: a restore point made only of moved-aside files — left by an import that failed during extraction, before the database stage — was reported as nothing to restore, leaving those folders in a hidden directory with no way to bring them back.
-* Fixed: twelve dialog texts, including the clean-install confirmation and every rollback prompt, were hardcoded English that no translation could reach.
-* The recovery note left for a broken site now also says where moved-aside themes and plugins are and how to put them back by hand.
-
-= 1.5.3 =
-* Fixed: the "links to other domains" check added in 1.5.2 never worked. Its pattern used # as both the delimiter and a character inside the pattern, so it failed to compile and the check reported that every link was fine — on a site that had twelve links pointing at the domain it was migrated from. A check that fails open is worse than no check, so it now also says plainly when it cannot complete instead of reporting all clear.
-
-= 1.5.2 =
-* Fixed: other plugins' admin notices appeared inside this plugin's dark header, where they were nearly unreadable — LiteSpeed Cache's "Purged all caches" showed as white text on a white box. WordPress moves notices to just after the first heading unless it finds a marker saying otherwise; that marker is now in place.
-* Added: the Verify tab reports which other domains your published content links to. The existing check only ran when an import had recorded where the site came from, and an import that crashed records nothing — which is exactly when content is most likely to still point at the old site. This one needs no record.
-* Fixed: an import now notes the address it came from as soon as the database restore finishes, rather than at the very end. An import that failed during the search-replace used to leave nothing behind, so the Change Domain tab could not offer the old address and the Verify tab had nothing to look for.
-
-= 1.5.1 =
-* Security: fixed a flaw introduced in 1.5.0. While an import was running, every one of this site's tables was set aside at once, including the options table. With no options table WordPress concludes it is not installed and sends all visitors to the installer, where anyone at all could have claimed the site and made themselves an administrator — no password needed, for as long as the restore took. A minimal stand-in options table is now put in place immediately, so WordPress still sees an installed site and the installer stays shut. If you installed 1.5.0, update before running another import.
-* Fixed: a snapshot record left behind after the tables it describes are gone — someone restores a database by hand, for instance — no longer blocks every future snapshot or offer a rollback that cannot work. It is detected and cleared.
-
-= 1.5.0 =
-* Added: an import can now be undone. Before the database restore begins, this site's existing tables are set aside rather than overwritten — instantly, using no extra disk space. If the import fails, is cancelled, or dies mid-way, the Import tab offers to put the site back exactly as it was. A successful import clears the copy automatically.
-* Added: a plain-text recovery file is written to the backups folder when an import starts, for the case where the site is broken badly enough that the dashboard cannot be reached. It explains how to disable plugins over FTP, how to read the error log, and includes the exact SQL to restore this site's database by hand, with its real table names.
-* Added: a Verify tab. After a migration it checks the site address, counts anything in the database still referring to the old address, finds settings corrupted by a find-and-replace, and reports on active plugins, the active theme, uploads, permalinks, the admin email and search engine visibility. It only reads; nothing is changed.
-
-= 1.4.1 =
-* Added: an import can no longer leave a site that will not load. Any plugin the restored database says is active but which is not installed here is dropped from the list, and a missing active theme is switched to one that exists. Previously WordPress tried to load the missing file on every request, which on some plugins is a fatal that takes wp-admin down with it.
-* Added: the pre-import check now warns when there is not enough free disk space to unpack the backup, and when the database holds tables belonging to another site.
-* Fixed: clean install no longer deletes the theme the site is currently using. Removing every theme left nothing to fall back to if the import then failed.
-
-= 1.4.0 =
-* Added: a clean install option on the Import tab. The default is unchanged — the backup is restored over the top and anything this site already had is left alone. Choosing clean install deletes every theme and plugin first, so the destination ends up matching the backup instead of holding both sites' worth. Uploads and must-use plugins are never deleted, and the option has its own confirmation.
-* Added: after restoring a database from an older WordPress, the schema upgrade WordPress would normally run on your first visit to wp-admin is now run as part of the import, so the site is ready when the import says it is.
-* Changed: the warning shown when the source site ran newer PHP now says what to do about it, and a site on PHP older than 8.0 is told so even when the backup does not require anything newer.
-
-= 1.3.16 =
-* Fixed: an import could take the destination site down completely with "Cannot redeclare owpm_bootstrap()". If the source site had this plugin in a differently named folder, the archive's copy was restored alongside the running one and both declared the same function — a fatal on every request, wp-admin included, so the site could not be recovered from the dashboard. The archive's copy is now skipped whatever folder it was in, and the function is wrapped in function_exists() so a second copy can never cause a fatal. The existing guard did not cover this: PHP binds a top-level function at compile time, before the guard runs.
-
-= 1.3.15 =
-* Fixed: every percent sign in your content was replaced by a random token in curly braces after a migration. esc_sql() ends by swapping % for a placeholder that is unique to the running process, and that went into the dump file; the importing site generated a different placeholder, so it never matched and the token was written to the database. Reported by @giancarlozer0.
-* Fixed: the backup download link failed with "link expired" on some setups. The link was HTML-escaped before being handed to JavaScript, so PHP read the nonce as "amp;_wpnonce" and the check could not pass. Reported by @presswizards.
-
-= 1.3.14 =
-* Changed: FAQ tidied. Three entries written for the plugin review, including one about AJAX actions and logged-out requests, were confusing out of that context; two are merged into a single security answer and one is removed. The remaining questions are ordered by what people actually ask first.
-* Changed: tested against WordPress 7.1.
-
-= 1.3.13 =
-* Changed: the installation instructions now give the full plugin name to search for. Searching "open migration" alone returns the larger migration plugins first, so the previous wording sent people to a result they would not find.
-
-= 1.3.12 =
-* Fixed: sites that relocate the uploads folder outside wp-content (via the UPLOADS constant or a custom upload path) produced a backup with no media in it. Uploads are now archived as a second root and restored to wherever the destination keeps them, so a move between two differently laid out installs works in both directions.
-* Changed: every path the plugin needs is now resolved through one small set of helpers in class-owpm-fs.php. Locations come from wp_upload_dir() and plugin_dir_path(); the content directory and site root are read in exactly one place each, with the reason documented there.
-
-= 1.3.11 =
-* Fixed: the text domain now matches the plugin slug, as the directory requires. All 262 translatable strings were updated.
-* Changed: the main plugin file and the backup folder are now named after the plugin slug as well, so every reference is consistent.
-
-= 1.3.10 =
-* Changed: the autoload value written during a restore now matches whatever the restored options table already uses. WordPress 6.6 replaced 'yes'/'no' in that column with 'on'/'off', and hardcoding either would eventually be wrong.
-
-= 1.3.9 =
-* Restored the Plugin URI header, now that the documentation site is published. It points at the plugin's own page and the Author URI points at the author's, which is the distinction the directory requires.
-
-= 1.3.8 =
-* Fixed: the server check assembled the uploads path from WP_CONTENT_DIR as a fallback, which is wrong on installs that move the uploads directory. It now resolves through wp_upload_dir() in every case.
-* Changed: backups are now stored in wp-content/uploads/open-migration-unlimited-site-transfer-backup/ rather than a separate folder name, matching the plugin slug.
-* Fixed: the Contributors line now names the WordPress.org account that owns the plugin.
-
-= 1.3.7 =
-* Fixed: the plugin and author URI headers held the same address. The directory requires them to differ, since one describes the plugin and the other the author. Only the author URI is declared now.
-
-= 1.3.6 =
-* Changed: the site-to-site token is now a plain, readable, delimited string instead of base64. It was only ever transport encoding, but the directory guidelines discourage anything resembling obfuscation, and a user should be able to read what they are pasting between two sites.
-* Changed: after the database restore the plugin now signs the operator straight back in and issues a fresh nonce, so the remaining import steps run fully authenticated. The one-time key is now only a fallback for archives that do not contain the operator's account.
-
-= 1.3.5 =
-* Added a documentation link to each tab, deep-linked to the section covering that tab, so help opens on the relevant part rather than the top of a long page.
-
-= 1.3.4 =
-* Changed: confirmations are now shown in a styled in-page dialog instead of the browser's native alert. The native one is titled with the raw hostname, which on a temporary host reads as something like "aquamarine-chimpanzee-231969.hostingersite.com says" - not what anyone wants to see immediately before overwriting a site. The new dialog is keyboard accessible, focuses Cancel by default so Enter cannot destroy anything, closes on Escape, and names exactly what is about to change.
-* Added author attribution: plugin headers now carry the author and plugin URIs, a credit line appears at the bottom of the plugin's own admin screen, and a documentation link is added to its row on the Plugins screen. Nothing is added to the public-facing site and no notices appear anywhere else in the dashboard.
-
-= 1.3.3 =
-* Removed an unnecessary jQuery dependency. The admin script uses `fetch` and plain DOM APIs, so jQuery was being loaded on the plugin's screen for nothing.
-* Added silence files to the plugin's subdirectories so no server can list their contents.
-* Added a command-line guard to the development version-bump script, so it cannot be executed over HTTP if the source repository is ever served directly.
-* Documented, in the code and in this readme, why a few AJAX actions are reachable without a login cookie and how they are secured.
-
-= 1.3.2 =
-* Security/correctness: the Change Domain field accepted malformed addresses and silently corrected them into something that looked valid. `htp://typo.com` became `https://htp//typo.com`, `ex ample.com` became `https://ex%20ample.com`, and a bare `example` was treated as a domain. Committing any of those would have rewritten the whole database to an address that does not resolve, taking the site offline. Addresses are now validated properly: the scheme must be http or https, the hostname must be a real hostname, an IP, or localhost, and whitespace, relative path segments and non-http schemes are refused with a specific explanation.
-* Changed: the Change Domain tab no longer guesses a previous address from your content. Inferring one from post GUIDs, from a staging hostname, or from domains appearing in post content was tested against real sites, and each approach put a wrong domain first: a domain the site had long abandoned, the host's own domain, and a third-party site whose images had been hotlinked. Only addresses actually recorded somewhere are offered now - an import this plugin performed, `siteurl`/`home` rows that wp-config.php is overriding, or the metadata inside a backup on the server.
-
-= 1.3.1 =
-* Fixed: the Change Domain tab only suggested a previous address when an import had been run by this plugin, so on most sites the field was simply empty. It now detects the previous address from several sources: an import this plugin performed, the raw `siteurl`/`home` rows in the database (which still hold the live domain when wp-config.php overrides them, as staging sites commonly do), and the metadata inside any backup archive on the server.
-* Changed: every detected address is offered as a labelled, clickable suggestion showing where it was found, rather than a single hidden guess. The most trusted one pre-fills the field.
-* Changed: when nothing can be detected, the tab now explains why instead of showing an empty field with no comment.
-
-= 1.2.0 =
-* Fixed: the export archive included the backup directory itself, so each export absorbed every earlier backup and grew without limit.
-* Fixed: import file identifiers were not restricted to safe characters, allowing a crafted request to write outside the backups directory.
-* Fixed: archive entries were extracted without validation, allowing a crafted `.zip` to write outside `wp-content` (zip slip).
-* Fixed: `database.sql` and `metadata.json` were extracted into the web root, where the database dump was publicly reachable. They now go to a private working directory.
-* Fixed: search and replace used only the last primary key column, which could overwrite unrelated rows in tables with a composite key such as `wp_term_relationships`.
-* Fixed: exports and imports read every table in the database rather than only those matching this site's prefix, affecting installs that share a database.
-* Fixed: backup list sorting parsed a localised date string instead of the file timestamp, producing the wrong order in many locales.
-* Fixed: directory protection used Apache 2.2 syntax only. Downloads now stream through WordPress after a permission check and the folder stays private on Apache, Nginx and IIS.
-* Fixed: failed database statements during an import were silently ignored and still reported as success.
-* Fixed: the database dump was split on `;` followed by a newline, which corrupted multi-line statements. An explicit statement delimiter is now used.
-* Fixed: `WP_Filesystem()` failure was not checked before use, causing a fatal error on hosts requiring FTP credentials.
-* Fixed: drag-and-drop was described in the interface but never implemented.
-* Fixed: site-to-site transfer issued its token before the export had finished, so the destination could pull a truncated archive.
-* Added: automatic table prefix conversion, including prefixed keys in `options` and `usermeta`.
-* Added: URL rewriting now also covers JSON-escaped, URL-encoded, protocol-relative and scheme-changed references.
-* Added: resumable database export and import, and resumable search and replace, so large sites cannot time out.
-* Added: server compatibility check on the Export tab.
-* Added: charset and collation fallback when restoring a MySQL 8 dump onto an older server.
-* Added: progress reporting, error surfacing and a post-import checklist.
-
-= 1.3.0 =
-* Added: **Change Domain** tab. Switch the site address after DNS is pointed at the new server, or move from `http` to `https`, at any time. Rewrites every reference in resumable batches.
-* Added: the Change Domain tab remembers the address an imported site came from and offers it as a one-click suggestion, so the domain never has to be retyped from memory.
-* Added: a DNS pre-flight check. Before committing, the plugin proves the new address really resolves to this server by requesting it with a one-time token and looking for its own marker. Changing the address before DNS propagates is the one mistake that takes a site offline at both addresses.
-* Added: the confirmation dialog now spells out the exact old and new address, and warns more strongly when the DNS check failed or was never run.
-* Security: the import session key is stored only as a SHA-256 hash, so reading the session file cannot yield a usable credential.
-* Fixed: the database export fetched a fixed 500 rows per batch regardless of row size, which could exhaust memory on sites with very large post content. Batch size is now derived from the table's average row length.
-* Added: transients are excluded from the export. They are a cache, so shipping them only bloated the archive and restored the source site's stale cached data.
-* Added: a warning before importing an archive created on a newer WordPress or PHP version than the destination runs.
-* Changed: the options table is restored last, so the destination keeps a working plugin list for the whole restore. This removed the need for the temporary `mu-plugins` loader, which is no longer created.
-* Changed: the interface now keeps status and the primary action visible without scrolling; step-by-step guidance and the included/excluded lists moved into collapsible sections.
-
-= 1.1.4 =
-* Interface refinements.
-
-= 1.1.1 =
-* Added dynamic instructions.
-* Refined interface spacing and typography.
-
-= 1.1.0 =
-* Chunked database export to avoid memory limits.
-* Switched to standard `.zip` archives.
-
-= 1.0.0 =
-* Initial release.
+Older releases are listed in changelog.txt, which ships with the plugin.
 
 == Upgrade Notice ==
 

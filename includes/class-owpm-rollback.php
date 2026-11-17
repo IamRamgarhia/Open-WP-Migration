@@ -636,22 +636,43 @@ class OWPM_Rollback {
 		// The specifics are written FIRST, and the note only points at them if
 		// that worked.
 		//
-		// Both writes used to be fire-and-forget, with the note going first.
-		// The way an import usually dies is the disk filling up, which is also
-		// the way this write usually fails -- so the likeliest single outcome
-		// was a locked-out operator reading a note that sent them to a file
-		// that had never been created, with the table names and the SQL now
-		// nowhere at all. Before the note was split they were in the one file
-		// that did get written.
+		// Both writes used to be fire-and-forget, with the note going first,
+		// so the likeliest single outcome was a locked-out operator reading a
+		// note that sent them to a file that had never been created.
 		//
-		// If the detail file cannot be written the specifics go back into the
-		// note itself. A note somebody can read over the web is a poor outcome;
-		// a site nobody can put back is a worse one.
+		// When that write fails the note falls back to instructions that need
+		// no specifics at all. The first version of this fallback copied the
+		// table names, the prefix, the SQL and the absolute parked path into
+		// the note instead -- which is a file anybody can fetch, and exactly
+		// the disclosure this whole change exists to stop. It is also not
+		// needed: everything the operator has to be told is already public.
+		// PREFIX and the 'parked-' prefix are constants in this plugin's
+		// source, and somebody at a phpMyAdmin window or an FTP listing can
+		// see which tables and which folder those name on their own site
+		// without being handed either. The shorter note is likelier to be
+		// written as well, which matters when the reason the first write
+		// failed was a full disk.
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, WordPress.PHP.NoSilencedErrors.Discouraged -- handled on the next line.
 		$wrote_detail = @file_put_contents( $dir . $detail, $details );
 
 		if ( false === $wrote_detail ) {
-			$note = str_replace( $pointer, $details, $note );
+			$fallback = "   The file holding the exact commands for this site could not be\n"
+				. "   written -- the disk is most likely full. You can still do both\n"
+				. "   steps by hand, and you do not need that file for either.\n\n"
+				. "   YOUR DATABASE\n"
+				. '   Your original tables are the ones whose names begin "' . self::PREFIX . "\".\n"
+				. "   Open phpMyAdmin (or Adminer) and you will see them listed\n"
+				. "   together. Take a database export first. Then, for each one,\n"
+				. "   delete the table of the name left after removing that prefix and\n"
+				. "   rename the prefixed one to it -- so the table called\n"
+				. '   "' . self::PREFIX . 'wp_posts" becomes "wp_posts".' . "\n\n"
+				. "   YOUR THEMES AND PLUGINS, IF YOU CHOSE \"CLEAN INSTALL\"\n"
+				. "   They are in the folder in this same directory whose name begins\n"
+				. "   parked-. Inside it are themes/ and plugins/, holding the folders\n"
+				. "   as they were. Move each one back into wp-content/themes or\n"
+				. "   wp-content/plugins.\n\n";
+
+			$note = str_replace( $pointer, $fallback, $note );
 		}
 
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, WordPress.PHP.NoSilencedErrors.Discouraged -- a failed note must not stop the import.
